@@ -33,7 +33,7 @@ func ConcatPath(baseDir, fileDir string) string {
 	Writing Local Metadata File Related
 */
 
-const createTable string = `create table if not exist index (
+const createTable string = `create table if not exists indexes (
 		fileName TEXT, 
 		version INT,
 		hashIndex INT,
