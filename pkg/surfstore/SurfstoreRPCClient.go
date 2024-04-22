@@ -5,6 +5,7 @@ import (
 	"time"
 
 	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type RPCClient struct {
@@ -15,7 +16,7 @@ type RPCClient struct {
 
 func (surfClient *RPCClient) GetBlock(blockHash string, blockStoreAddr string, block *Block) error {
 	// connect to the server
-	conn, err := grpc.Dial(blockStoreAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(blockStoreAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func (surfClient *RPCClient) PutBlock(block *Block, blockStoreAddr string, succ 
 	panic("todo")
 }
 
-func (surfClient *RPCClient) HasBlocks(blockHashesIn []string, blockStoreAddr string, blockHashesOut *[]string) error {
+func (surfClient *RPCClient) MissingBlocks(blockHashesIn []string, blockStoreAddr string, blockHashesOut *[]string) error {
 	panic("todo")
 }
 

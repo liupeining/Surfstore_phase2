@@ -11,7 +11,7 @@ service BlockStore {
 
     rpc PutBlock (Block) returns (Success) {}
 
-    rpc HasBlocks (BlockHashes) returns (BlockHashes) {}
+    rpc MissingBlocks (BlockHashes) returns (BlockHashes) {}
 }
 
 service MetaStore {
