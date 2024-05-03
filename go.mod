@@ -1,6 +1,6 @@
 module cse224/proj4
 
-go 1.17
+go 1.22
 
 require (
 	google.golang.org/grpc v1.44.0

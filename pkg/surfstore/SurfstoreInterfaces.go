@@ -26,8 +26,8 @@ type BlockStoreInterface interface {
 	PutBlock(ctx context.Context, block *Block) (*Success, error)
 
 	// Given a list of hashes “in”, returns a list containing the
-	// subset of in that are stored in the key-value store
-	HasBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error)
+	// hashes that are not stored in the key-value store
+	MissingBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error)
 }
 
 type ClientInterface interface {
@@ -39,5 +39,5 @@ type ClientInterface interface {
 	// BlockStore
 	GetBlock(blockHash string, blockStoreAddr string, block *Block) error
 	PutBlock(block *Block, blockStoreAddr string, succ *bool) error
-	HasBlocks(blockHashesIn []string, blockStoreAddr string, blockHashesOut *[]string) error
+	MissingBlocks(blockHashesIn []string, blockStoreAddr string, blockHashesOut *[]string) error
 }

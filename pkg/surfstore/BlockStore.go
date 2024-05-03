@@ -18,8 +18,8 @@ func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, err
 }
 
 // Given a list of hashes “in”, returns a list containing the
-// subset of in that are stored in the key-value store
-func (bs *BlockStore) HasBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error) {
+// hashes that are not stored in the key-value store
+func (bs *BlockStore) MissingBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error) {
 	panic("todo")
 }
 

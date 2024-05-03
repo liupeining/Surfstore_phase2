@@ -4,7 +4,7 @@ import (
 	"cse224/proj4/pkg/surfstore"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -65,7 +65,7 @@ func main() {
 	// Disable log outputs if debug flag is missing
 	if !(*debug) {
 		log.SetFlags(0)
-		log.SetOutput(ioutil.Discard)
+		log.SetOutput(io.Discard)
 	}
 
 	rpcClient := surfstore.NewSurfstoreRPCClient(hostPort, baseDir, blockSize)
