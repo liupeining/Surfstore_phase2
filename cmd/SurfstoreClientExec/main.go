@@ -49,13 +49,17 @@ func main() {
 	// Use tail arguments to hold non-flag arguments
 	args := flag.Args()
 
+	// ARG_COUNT = 3, including: host:port, baseDir, blockSize
 	if len(args) != ARG_COUNT {
 		flag.Usage()
 		os.Exit(EX_USAGE)
 	}
 
+	// hostport: IP address and port of the MetaStore the client is syncing to
 	hostPort := args[0]
+	// baseDir: Base directory of the client
 	baseDir := args[1]
+	// blockSize: Size of the blocks used to fragment files
 	blockSize, err := strconv.Atoi(args[2])
 	if err != nil {
 		flag.Usage()
@@ -68,6 +72,9 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
+	// Create a new SurfstoreRPCClient
 	rpcClient := surfstore.NewSurfstoreRPCClient(hostPort, baseDir, blockSize)
+
+	// ClientSync: Sync the client with the MetaStore
 	surfstore.ClientSync(rpcClient)
 }
