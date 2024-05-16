@@ -8,25 +8,27 @@ import (
 type BlockStore struct {
 	// BlockMap is a map that stores the block hash as the key and the block as the value
 	BlockMap map[string]*Block
-	rwMutex  sync.RWMutex
+	RWMutex  sync.RWMutex
 	UnimplementedBlockStoreServer
 }
 
 func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Block, error) {
 	// hash -> block
 	// RWMutex: when multiple clients try to get the block, map could be modified
-	bs.rwMutex.RLock()
+	bs.RWMutex.RLock()
+	defer bs.RWMutex.RUnlock()
 	block := bs.BlockMap[blockHash.Hash]
-	bs.rwMutex.RUnlock()
+	//bs.RWMutex.RUnlock()
 	return block, nil
 }
 
 func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, error) {
 	// block -> hash, then add to the map
 	hash := GetBlockHashString(block.BlockData)
-	bs.rwMutex.Lock()
+	bs.RWMutex.Lock()
+	defer bs.RWMutex.RUnlock()
 	bs.BlockMap[hash] = block
-	bs.rwMutex.Unlock()
+	//bs.RWMutex.Unlock()
 	return &Success{Flag: true}, nil
 }
 
@@ -34,10 +36,11 @@ func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, err
 // hashes that are not stored in the key-value store
 func (bs *BlockStore) MissingBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error) {
 	hashNoStore := make([]string, 0)
+	bs.RWMutex.RLock()
+	defer bs.RWMutex.RUnlock()
 	for _, blockHash := range blockHashesIn.Hashes {
-		bs.rwMutex.RLock()
 		_, exists := bs.BlockMap[blockHash]
-		bs.rwMutex.RUnlock()
+		//bs.RWMutex.RUnlock()
 		if !exists {
 			hashNoStore = append(hashNoStore, blockHash)
 		}
