@@ -61,7 +61,21 @@ func WriteMetaFile(fileMetas map[string]*FileMetaData, baseDir string) error {
 		log.Fatal("Error During Meta Write Back")
 	}
 	statement.Exec()
-	panic("todo")
+	//panic("todo")
+	statement, err = db.Prepare(insertTuple)
+	if err != nil {
+		log.Fatal("Error During Meta Write Back")
+	}
+	// The table has 4 columns which are fileName, version, hashIndex, hashValue.
+	// Their types are TEXT, INT, INT, and TEXT respectively
+	for fileName, filemeta := range fileMetas {
+		for hashIndex, hashValue := range filemeta.BlockHashList {
+			statement.Exec(fileName, filemeta.Version, hashIndex, hashValue)
+		}
+	}
+	statement.Close()
+	db.Close()
+	return nil
 }
 
 /*
@@ -75,13 +89,17 @@ const getTuplesByFileName string = ``
 // The key is the file's name and the value is the file's metadata.
 // You can use this function to load the index.db file in this project.
 func LoadMetaFromMetaFile(baseDir string) (fileMetaMap map[string]*FileMetaData, e error) {
+	//fmt.Println("Loading Meta From Meta File")
 	metaFilePath, _ := filepath.Abs(ConcatPath(baseDir, DEFAULT_META_FILENAME))
+	//fmt.Println("Meta File Path: ", metaFilePath)
 	fileMetaMap = make(map[string]*FileMetaData)
+	//fmt.Println("File Meta Map: ", fileMetaMap)
 	metaFileStats, e := os.Stat(metaFilePath)
 	if e != nil || metaFileStats.IsDir() {
 		return fileMetaMap, nil
 	}
 	db, err := sql.Open("sqlite3", metaFilePath)
+	db = db // remove warning
 	if err != nil {
 		log.Fatal("Error When Opening Meta")
 	}
