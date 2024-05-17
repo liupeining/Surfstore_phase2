@@ -1,8 +1,136 @@
 package surfstore
 
+import (
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+)
+
+func CompareBlockHashList(h1, h2 []string) bool {
+	if len(h1) != len(h2) {
+		return false
+	}
+	for i := range h1 {
+		if h1[i] != h2[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // Implement the logic for a client syncing with the server here.
 func ClientSync(client RPCClient) {
+	//The client should first scan the base directory, and for each file, compute that file’s hash list. The
+	//client should then consult the local index file and compare the results, to see whether
+	//(1) there are now new files in the base directory that aren’t in the index file, or
+	//(2) files that are in the index file, but have changed since the last time the client was executed
+	//(i.e., the hash list is different).
+	baseDir := client.BaseDir
+	//blockSize := client.BlockSize
+	//MetaStoreAddr := client.MetaStoreAddr
 
+	// get local hashlist
+	localFileInfoMap, err := LoadMetaFromMetaFile(baseDir)
+	if err != nil {
+		log.Fatalf("Error while loading metadata from index.db: %v", err)
+	}
+
+	filenames2HashMap := make(map[string][]string)
+
+	// walk through the base directory, cal hash
+	err = filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
+		// print file name
+		// check if it is a file, also not .DS_Store
+		if !info.IsDir() && info.Name() != ".DS_Store" && info.Name() != "index.db" {
+			fmt.Println("file name: ", info.Name())
+			fmt.Println("convert to hash")
+			file, err := os.Open(path)
+			if err != nil {
+				log.Printf("Cannot open file %s: %v", path, err)
+				return nil
+			}
+			defer file.Close()
+
+			// calculate block number
+			blocknum := info.Size() / int64(client.BlockSize)
+			if info.Size()%int64(client.BlockSize) != 0 {
+				blocknum++
+			}
+			fmt.Println(blocknum)
+
+			// block -> hash list (single file)
+			blockHashList := make([]string, blocknum)
+			err2, done := blockToHash(path, blocknum, client, file, blockHashList)
+			if done {
+				return err2
+			}
+			updateLocalIndexFile(localFileInfoMap, info, blockHashList, baseDir) // compare with local index file
+			filenames2HashMap[info.Name()] = blockHashList
+		}
+
+		// debug
+		for k, v := range filenames2HashMap {
+			fmt.Println(k, v[0])
+		}
+		// debug finish
+		return nil
+	})
+
+	localIndex, err := LoadMetaFromMetaFile(client.BaseDir)
+	fmt.Println("local index: ", localIndex)
+}
+
+func updateLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.FileInfo, blockHashList []string, baseDir string) {
+	if localFileMetaData, ok := localFileInfoMap[info.Name()]; ok {
+		if !CompareBlockHashList(localFileMetaData.BlockHashList, blockHashList) {
+			// file has changed -> update local index file
+			localFileInfoMap[info.Name()] = &FileMetaData{
+				Filename: info.Name(),
+				Version:  localFileMetaData.Version + 1,
+			}
+			fmt.Println("File has changed: ", info.Name())
+			fmt.Println("Version: ", localFileMetaData.Version+1)
+		}
+	} else {
+		// new file -> update local index file
+		localFileInfoMap[info.Name()] = &FileMetaData{
+			Filename:      info.Name(),
+			Version:       0,
+			BlockHashList: blockHashList,
+		}
+		fmt.Println("New file: ", info.Name())
+		fmt.Println("Version: ", 0)
+	}
+
+	// mark deleted files
+	for filename := range localFileInfoMap {
+		filePath := filepath.Join(baseDir, filename)
+		_, err := os.Stat(filePath)
+		if err != nil {
+			// file not exist -> mark as deleted
+			localFileInfoMap[filename].Version++
+			localFileInfoMap[filename].BlockHashList = make([]string, 0)
+			localFileInfoMap[filename].BlockHashList = append(localFileInfoMap[filename].BlockHashList, "0")
+			fmt.Println("File deleted: ", filename)
+		}
+	}
+}
+
+func blockToHash(path string, blocknum int64, client RPCClient, file *os.File, blockHashList []string) (error, bool) {
+	for i := int64(0); i < blocknum; i++ {
+		block := make([]byte, client.BlockSize)
+		n, err := file.Read(block)
+		if err != nil {
+			log.Printf("Cannot read block %d from file %s: %v", i, path, err)
+			return nil, true
+		}
+		blockHashList[i] = GetBlockHashString(block[:n])
+		if i == 0 {
+			fmt.Println("block hash: ", blockHashList[i])
+		}
+	}
+	return nil, false
 }
 
 //	//panic("todo")
@@ -226,14 +354,3 @@ func ClientSync(client RPCClient) {
 //	}
 //}
 //
-//func CompareBlockHashList(h1, h2 []string) bool {
-//	if len(h1) != len(h2) {
-//		return false
-//	}
-//	for i := range h1 {
-//		if h1[i] != h2[i] {
-//			return false
-//		}
-//	}
-//	return true
-//}
