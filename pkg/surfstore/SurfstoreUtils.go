@@ -22,21 +22,347 @@ func CompareBlockHashList(h1, h2 []string) bool {
 // Implement the logic for a client syncing with the server here.
 func ClientSync(client RPCClient) {
 
+	baseDir, localFileInfoMap, err := getLocalInfo(client)
+	err = updateLocalIndexFile(client, err, baseDir, localFileInfoMap)
+	//err = debugUpdateLocalFile(localFileInfoMap, err, baseDir)
+
+	//remoteIndex, err := getRemoteIndexFile(client, err)
+	// debug
+	remoteIndex, err := LoadMetaFromMetaFile("testremote")
+	fmt.Println("start print remote index")
+	for k, v := range remoteIndex {
+		fmt.Println(k, v.BlockHashList[0], v.Version)
+	}
+	fmt.Println("finish print remote index")
+
 	// ************************************************************
-	//The client should first scan the base directory, and for each file, compute that file’s hash list. The
-	//client should then consult the local index file and compare the results, to see whether
-	//(1) there are now new files in the base directory that aren’t in the index file, or
-	//(2) files that are in the index file, but have changed since the last time the client was executed
-	//(i.e., the hash list is different).
+	// First, it is possible that the remote index refers to a file not present in the local index or in the
+	// base directory. In this case, the client should download the blocks associated with that file,
+	// reconstitute that file in the base directory, and then add the updated FileInfo information to the
+	// local index.
 	// ************************************************************
 
-	// get local hashlist
-	baseDir := client.BaseDir
-	localFileInfoMap, err := LoadMetaFromMetaFile(baseDir)
-	if err != nil {
-		log.Fatalf("Error while loading metadata from index.db: %v", err)
+	// download file logic
+	// - get block store address
+	// - get block from server
+	// - write block to file
+	// - update local index
+
+	// upload file logic (need handle conflict)
+	// - get block store address
+	// - put block to block store (block must be put before update index)
+	// - update remote index
+
+	// delete local file logic
+	// - delete local file
+	// - update local index
+	//  - version++
+	//  - block hash list = "0"
+
+	// delete remote file logic
+	// - update remote index
+	//  - version++
+	//  - block hash list = "0"
+
+	// logic
+	// - local index no file -> download file (done)
+	// - local index has file
+	//   - remote index no file -> upload file (done)
+	//   - remote index has file -> compare version (done)
+	//     - local version > remote version -> check local hash[0] (done)
+	//       - local hash[0] == "0" -> delete remote file (done)
+	//       - local hash[0] != "0" -> upload file (done)
+	//     - local version < remote version -> check remote hash[0] (done)
+	//       - remote hash[0] == "0" -> delete local file (done)
+	//       - remote hash[0] != "0" -> download file (done)
+	//     - local version = remote version -> compare block hash list (done)
+	//       - local hash list == remote hash list -> sync with remote, do nothing (done)
+	//       - local hash list != remote hash list -> there is conflict, tell client, and download/delete local file (done)
+	// 		   - same as local version < remote version (done)
+
+	// TODO: I guess the conflict handle is wrong, for in the instruction,
+	// version confilct should be checked by uploadblock -> success.
+	// but I think this version still works fine.
+
+	// local index no file -> download file
+	for remoteFilename, remoteFileMetaData := range remoteIndex {
+		fmt.Println("remote file name: ", remoteFilename)
+		if _, ok := localFileInfoMap[remoteFilename]; !ok {
+			if remoteFileMetaData.BlockHashList[0] != "0" { // remote file is not deleted, download file
+				fmt.Println("downloading file")
+				blockStoreAddr := ""
+				client.GetBlockStoreAddr(&blockStoreAddr)
+				for _, blockHash := range remoteFileMetaData.BlockHashList {
+					var block Block
+					err = client.GetBlock(blockHash, blockStoreAddr, &block)
+					if err != nil {
+						log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
+					}
+					// get file to local base directory
+					localPath := filepath.Join(client.BaseDir, remoteFilename)
+					localFile, err := os.Create(localPath)
+					if err != nil {
+						log.Fatalf("Cannot create file %s: %v", localPath, err)
+					}
+					defer localFile.Close()
+					// sync write block to file
+					_, err = localFile.Write(block.BlockData)
+					if err != nil {
+						log.Fatalf("Error while writing block to file %s: %v", localPath, err)
+					}
+				}
+				// update local index
+				localFileInfoMap[remoteFilename] = remoteFileMetaData
+			} else {
+				// remote file is deleted, update local index
+				localFileInfoMap[remoteFilename] = remoteFileMetaData
+			}
+		} else {
+			// local index has file, remote index has file -> compare version
+			localFileMetaData := localFileInfoMap[remoteFilename]
+			if localFileMetaData.Version > remoteFileMetaData.Version {
+				// - local hash[0] == "0" -> delete remote file
+				// - local hash[0] != "0" -> upload file
+				if localFileMetaData.BlockHashList[0] == "0" {
+					// delete remote file
+					remoteFileMetaData.Version++
+					remoteFileMetaData.BlockHashList = []string{"0"}
+					remoteIndex[remoteFilename] = remoteFileMetaData
+					fmt.Println("Delete remote file: ", remoteFilename)
+				} else {
+					// upload file
+					localPath := filepath.Join(client.BaseDir, remoteFilename)
+					file, err := os.Open(localPath)
+					if err != nil {
+						log.Fatalf("Cannot open file %s: %v", localPath, err)
+					}
+					defer file.Close()
+					blockStoreAddr := ""
+					client.GetBlockStoreAddr(&blockStoreAddr)
+
+					// get block num for the file
+					filestats, err := file.Stat()
+					if err != nil {
+						log.Fatalf("Cannot get file stats %s: %v", localPath, err)
+					}
+					blocknum := filestats.Size() / int64(client.BlockSize)
+					if filestats.Size()%int64(client.BlockSize) != 0 {
+						blocknum++
+					}
+
+					// upload block to block store
+					if blocknum == 0 {
+						var block Block
+						block.BlockData = nil
+						block.BlockSize = 0
+						var success bool
+						err = client.PutBlock(&block, blockStoreAddr, &success)
+						if err != nil || !success {
+							log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+						}
+					} else {
+						blockData := make([]byte, client.BlockSize)
+						for i := int64(0); i < blocknum; i++ {
+							n, err := file.Read(blockData)
+							if err != nil {
+								log.Fatalf("Cannot read block %d from file %s: %v", i, localPath, err)
+							}
+							var block Block
+							block.BlockData = blockData[:n]
+							block.BlockSize = int32(n)
+							var success bool
+							err = client.PutBlock(&block, blockStoreAddr, &success)
+							if err != nil || !success {
+								log.Fatalf("Error while putting block %d to the server: %v", i, err)
+							}
+						}
+					}
+
+					// update remote index
+					remoteFileMetaData.Version = localFileMetaData.Version
+					remoteFileMetaData.BlockHashList = localFileMetaData.BlockHashList
+					remoteIndex[remoteFilename] = remoteFileMetaData
+					fmt.Println("Upload file: ", remoteFilename)
+				}
+			} else if localFileMetaData.Version < remoteFileMetaData.Version {
+				// - remote hash[0] == "0" -> delete local file
+				// - remote hash[0] != "0" -> download file
+				if remoteFileMetaData.BlockHashList[0] == "0" {
+					// delete local file
+					err = os.Remove(filepath.Join(baseDir, remoteFilename))
+					if err != nil {
+						log.Fatalf("Error while deleting file %s: %v", remoteFilename, err)
+					}
+					// update local index
+					localFileInfoMap[remoteFilename] = remoteFileMetaData
+					fmt.Println("Delete local file: ", remoteFilename)
+				} else {
+					// download file
+					fmt.Println("downloading file")
+					blockStoreAddr := ""
+					client.GetBlockStoreAddr(&blockStoreAddr)
+					for _, blockHash := range remoteFileMetaData.BlockHashList {
+						var block Block
+						err = client.GetBlock(blockHash, blockStoreAddr, &block)
+						if err != nil {
+							log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
+						}
+						// get file to local base directory
+						localPath := filepath.Join(client.BaseDir, remoteFilename)
+						localFile, err := os.Create(localPath)
+						if err != nil {
+							log.Fatalf("Cannot create file %s: %v", localPath, err)
+						}
+						defer localFile.Close()
+						// sync write block to file
+						_, err = localFile.Write(block.BlockData)
+						if err != nil {
+							log.Fatalf("Error while writing block to file %s: %v", localPath, err)
+						}
+					}
+					// update local index
+					localFileInfoMap[remoteFilename] = remoteFileMetaData
+				}
+			} else if localFileMetaData.Version == remoteFileMetaData.Version {
+				// - local hash list == remote hash list -> sync with remote, do nothing
+				// - local hash list != remote hash list -> there is conflict, tell client, and download/delete local file
+				// - same as local version < remote version
+				if !CompareBlockHashList(localFileMetaData.BlockHashList, remoteFileMetaData.BlockHashList) {
+					fmt.Println("Conflict: %s, unsuccessful local change, sync with remote", remoteFilename)
+					if remoteFileMetaData.BlockHashList[0] == "0" {
+						// delete local file
+						err = os.Remove(filepath.Join(baseDir, remoteFilename))
+						if err != nil {
+							log.Fatalf("Error while deleting file %s: %v", remoteFilename, err)
+						}
+						// update local index
+						localFileInfoMap[remoteFilename] = remoteFileMetaData
+						fmt.Println("Delete local file: ", remoteFilename)
+					} else {
+						// download file
+						fmt.Println("downloading file")
+						blockStoreAddr := ""
+						client.GetBlockStoreAddr(&blockStoreAddr)
+						for _, blockHash := range remoteFileMetaData.BlockHashList {
+							var block Block
+							err = client.GetBlock(blockHash, blockStoreAddr, &block)
+							if err != nil {
+								log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
+							}
+							// get file to local base directory
+							localPath := filepath.Join(client.BaseDir, remoteFilename)
+							localFile, err := os.Create(localPath)
+							if err != nil {
+								log.Fatalf("Cannot create file %s: %v", localPath, err)
+							}
+							defer localFile.Close()
+							// sync write block to file
+							_, err = localFile.Write(block.BlockData)
+							if err != nil {
+								log.Fatalf("Error while writing block to file %s: %v", localPath, err)
+							}
+						}
+						// update local index
+						localFileInfoMap[remoteFilename] = remoteFileMetaData
+					}
+				} else {
+					// sync with remote, do nothing
+				}
+			}
+		}
 	}
 
+	// - local index has file
+	//   - remote index no file -> upload file (done)
+	for localFilename, localFileMetaData := range localFileInfoMap {
+		if _, ok := remoteIndex[localFilename]; !ok {
+			if localFileMetaData.BlockHashList[0] != "0" {
+				// upload file
+				localPath := filepath.Join(client.BaseDir, localFilename)
+				file, err := os.Open(localPath)
+				if err != nil {
+					log.Fatalf("Cannot open file %s: %v", localPath, err)
+				}
+				defer file.Close()
+				blockStoreAddr := ""
+				client.GetBlockStoreAddr(&blockStoreAddr)
+
+				// get block num for the file
+				filestats, err := file.Stat()
+				if err != nil {
+					log.Fatalf("Cannot get file stats %s: %v", localPath, err)
+				}
+				blocknum := filestats.Size() / int64(client.BlockSize)
+				if filestats.Size()%int64(client.BlockSize) != 0 {
+					blocknum++
+				}
+
+				// upload block to block store
+				if blocknum == 0 {
+					var block Block
+					block.BlockData = nil
+					block.BlockSize = 0
+					var success bool
+					err = client.PutBlock(&block, blockStoreAddr, &success)
+					if err != nil || !success {
+						log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+					}
+				} else {
+					blockData := make([]byte, client.BlockSize)
+					for i := int64(0); i < blocknum; i++ {
+						n, err := file.Read(blockData)
+						if err != nil {
+							log.Fatalf("Cannot read block %d from file %s: %v", i, localPath, err)
+						}
+						var block Block
+						block.BlockData = blockData[:n]
+						block.BlockSize = int32(n)
+						var success bool
+						err = client.PutBlock(&block, blockStoreAddr, &success)
+						if err != nil || !success {
+							log.Fatalf("Error while putting block %d to the server: %v", i, err)
+						}
+					}
+				}
+				// update remote index
+				remoteIndex[localFilename] = localFileMetaData
+				fmt.Println("Upload file: ", localFilename)
+			} else {
+				// local file is deleted, update remote index
+				remoteIndex[localFilename] = localFileMetaData
+				fmt.Println("Upload file: ", localFilename)
+			}
+		}
+	}
+}
+
+func getRemoteIndexFile(client RPCClient, err error) (map[string]*FileMetaData, error) {
+	remoteIndex := make(map[string]*FileMetaData)
+	err = client.GetFileInfoMap(&remoteIndex)
+	if err != nil {
+		log.Fatalf("Error while getting FileInfoMap from the server: %v", err)
+	}
+	return remoteIndex, err
+}
+
+func debugUpdateLocalFile(localFileInfoMap map[string]*FileMetaData, err error, baseDir string) error {
+	// debug
+	fmt.Println("start print local index")
+	for k, v := range localFileInfoMap {
+		fmt.Println(k, v.BlockHashList[0], v.Version)
+	}
+	fmt.Println("finish print local index")
+	// temperay write into index.db
+	err = WriteMetaFile(localFileInfoMap, baseDir)
+	if err != nil {
+		log.Fatalf("Error while writing metadata to index.db: %v", err)
+	} // seems work fine
+
+	// debug finish
+	return err
+}
+
+func updateLocalIndexFile(client RPCClient, err error, baseDir string, localFileInfoMap map[string]*FileMetaData) error {
 	err = filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && info.Name() != ".DS_Store" && info.Name() != "index.db" {
 			fmt.Println("file name: ", info.Name())
@@ -73,168 +399,21 @@ func ClientSync(client RPCClient) {
 			fmt.Println("block hash list: ", blockHashList[0])
 			// debug finish
 
-			updateLocalIndexFile(localFileInfoMap, info, blockHashList, baseDir) // compare with local index file
+			compareLocalIndexFile(localFileInfoMap, info, blockHashList, baseDir) // compare with local index file
 		}
 		return nil
 	})
 	checkLocalDelete(localFileInfoMap, baseDir) // mark deleted files
+	return err
+}
 
-	// debug
-	fmt.Println("start print local index")
-	for k, v := range localFileInfoMap {
-		fmt.Println(k, v.BlockHashList[0], v.Version)
-	}
-	fmt.Println("finish print local index")
-	// temperay write into index.db
-	err = WriteMetaFile(localFileInfoMap, baseDir)
+func getLocalInfo(client RPCClient) (string, map[string]*FileMetaData, error) {
+	baseDir := client.BaseDir
+	localFileInfoMap, err := LoadMetaFromMetaFile(baseDir)
 	if err != nil {
-		log.Fatalf("Error while writing metadata to index.db: %v", err)
-	} // seems work fine
-
-	// debug finish
-
-	// ************************************************************
-	// Next, the client should connect to the server and download an updated FileInfoMap. For the
-	// purposes of this discussion, let’s call this the “remote index.”
-	// The client should now compare the local index (and any changes to local files not reflected in
-	// the local index) with the remote index.
-	// ************************************************************
-
-	remoteIndex := make(map[string]*FileMetaData)
-	err = client.GetFileInfoMap(&remoteIndex)
-	if err != nil {
-		log.Fatalf("Error while getting FileInfoMap from the server: %v", err)
+		log.Fatalf("Error while loading metadata from index.db: %v", err)
 	}
-
-	// ************************************************************
-	// First, it is possible that the remote index refers to a file not present in the local index or in the
-	// base directory. In this case, the client should download the blocks associated with that file,
-	// reconstitute that file in the base directory, and then add the updated FileInfo information to the
-	// local index.
-	// ************************************************************
-
-	// logic
-	// - local index no file -> download file (done)
-	// - local index has file
-	//   - remote index no file -> upload file
-	//   - remote index has file -> compare version
-	//     - local version > remote version -> check local hash[0]
-	//       - local hash[0] == "0" -> delete remote file
-	//       - local hash[0] != "0" -> upload file
-	//     - local version < remote version -> check remote hash[0]
-	//       - remote hash[0] == "0" -> delete local file
-	//       - remote hash[0] != "0" -> download file
-	//     - local version = remote version -> compare block hash list
-	//       - local hash list == remote hash list -> sync with remote, do nothing
-	//       - local hash list != remote hash list -> there is conflict, tell client, and download/delete local file
-	// 		   - same as local version < remote version
-
-	// download file logic
-	// - get block store address
-	// - get block from server
-	// - write block to file
-	// - update local index
-
-	// upload file logic (need handle conflict)
-	// - get block store address
-	// - put block to server
-	// - update remote index
-
-	// delete local file logic
-	// - delete local file
-	// - update local index
-	//  - version++
-	//  - block hash list = "0"
-
-	// delete remote file logic
-	// - update remote index
-	//  - version++
-	//  - block hash list = "0"
-
-	for remoteFilename, remoteFileMetaData := range remoteIndex {
-		if _, ok := localFileInfoMap[remoteFilename]; !ok {
-			// local index no file -> download file
-			if remoteFileMetaData.BlockHashList[0] != "0" { // remote file is not deleted
-				blockStoreAddr := ""
-				client.GetBlockStoreAddr(&blockStoreAddr)
-				for _, blockHash := range remoteFileMetaData.BlockHashList {
-					var block Block
-					err = client.GetBlock(blockHash, blockStoreAddr, &block)
-					if err != nil {
-						log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-					}
-					// get file to local base directory
-					localPath := filepath.Join(client.BaseDir, remoteFilename)
-					localFile, err := os.Create(localPath)
-					if err != nil {
-						log.Fatalf("Cannot create file %s: %v", localPath, err)
-					}
-					defer localFile.Close()
-					// sync write block to file
-					_, err = localFile.Write(block.BlockData)
-					if err != nil {
-						log.Fatalf("Error while writing block to file %s: %v", localPath, err)
-					}
-				}
-				// update local index
-				localFileInfoMap[remoteFilename] = remoteFileMetaData
-			} else {
-				// remote file is deleted, update local index
-				localFileInfoMap[remoteFilename] = remoteFileMetaData
-			}
-
-		}
-	}
-
-	//for remoteFilename, remoteFileMetaData := range remoteIndex {
-	//	localFileMetaData, ok := localFileInfoMap[remoteFilename]
-	//	_, err = os.Stat(filepath.Join(baseDir, remoteFilename))
-	//
-	//	// - local index no file -> download file
-	//	// - local index has file
-	//
-	//	if !ok || (ok && remoteFileMetaData.Version > localFileMetaData.Version) || err != nil {
-	//
-	//		// check if file is deleted
-	//		if ok && remoteFileMetaData.Version > localFileMetaData.Version {
-	//			if remoteFileMetaData.BlockHashList[0] == "0" {
-	//				err = os.Remove(filepath.Join(baseDir, remoteFilename))
-	//				if err != nil {
-	//					log.Fatalf("Error while deleting file %s: %v", remoteFilename, err)
-	//				}
-	//				// update local index
-	//				localFileInfoMap[remoteFilename] = remoteFileMetaData
-	//				continue
-	//			}
-	//		}
-	//
-	//		// download file
-	//		blockStoreAddr := ""
-	//		surfClient.GetBlockStoreAddr(&blockStoreAddr)
-	//		for _, blockHash := range remoteFileMetaData.BlockHashList {
-	//			if err != nil {
-	//				log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-	//			}
-	//			// get file to local base directory
-	//			localPath := filepath.Join(client.BaseDir, remoteFilename)
-	//			localFile, err := os.Create(localPath)
-	//			if err != nil {
-	//				log.Fatalf("Cannot create file %s: %v", localPath, err)
-	//			}
-	//			defer localFile.Close()
-	//			// sync write block to file
-	//			var block Block
-	//			err = surfClient.GetBlock(blockHash, blockStoreAddr, &block)
-	//			if err != nil {
-	//				log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-	//			}
-	//			_, err = localFile.Write(block.BlockData)
-	//		}
-	//		// update local index
-	//		localFileInfoMap[remoteFilename] = remoteFileMetaData
-	//	}
-	//}
-
+	return baseDir, localFileInfoMap, err
 }
 
 func checkLocalDelete(localFileInfoMap map[string]*FileMetaData, baseDir string) {
@@ -257,7 +436,7 @@ func checkLocalDelete(localFileInfoMap map[string]*FileMetaData, baseDir string)
 	}
 }
 
-func updateLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.FileInfo, blockHashList []string, baseDir string) {
+func compareLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.FileInfo, blockHashList []string, baseDir string) {
 	if localFileMetaData, ok := localFileInfoMap[info.Name()]; ok {
 
 		// debug
@@ -302,70 +481,3 @@ func blockToHash(path string, blocknum int64, client RPCClient, file *os.File, b
 	}
 	return nil, false
 }
-
-//	//Next, it is possible that there are new files in the local base directory that aren’t in the local index
-//	//or in the remote index. The client should upload the blocks corresponding to this file to the
-//	//server, then update the server with the new FileInfo. If that update is successful, then the client
-//	//should update its local index. Note it is possible that while this operation is in progress, some
-//	//other client makes it to the server first, and creates the file first. In that case, the UpdateFile()
-//	//operation will fail with a version error, and the client should handle this conflict as described in
-//	//the next section.
-//
-//	for localFilename, localFileMetaData := range localFileInfoMap {
-//		_, ok := remoteIndex[localFilename]
-//		if !ok || remoteIndex[localFilename].Version < localFileMetaData.Version {
-//			// upload file
-//			blockStoreAddr := ""
-//			surfClient.GetBlockStoreAddr(&blockStoreAddr)
-//			for _, blockHash := range localFileMetaData.BlockHashList {
-//				var block Block
-//				var success bool
-//				err = surfClient.PutBlock(&block, blockStoreAddr, &success)
-//				if err != nil {
-//					log.Fatalf("Error while putting block %s to the server: %v", blockHash, err)
-//				}
-//				// handle conflict
-//				if !success {
-//					fmt.Println("Conflict: file has been updated by another client")
-//					// get updated remote index
-//					err = surfClient.GetFileInfoMap(&remoteIndex)
-//					if err != nil {
-//						log.Fatalf("Error while getting FileInfoMap from the server: %v", err)
-//					}
-//					// download the updated file
-//					remoteFileMetaData := remoteIndex[localFilename]
-//					remoteFilename := remoteFileMetaData.Filename
-//					blockStoreAddr := ""
-//					surfClient.GetBlockStoreAddr(&blockStoreAddr)
-//					for _, blockHash := range remoteFileMetaData.BlockHashList {
-//						if err != nil {
-//							log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-//						}
-//						// get file to local base directory
-//						localPath := filepath.Join(client.BaseDir, remoteFilename)
-//						localFile, err := os.Create(localPath)
-//						if err != nil {
-//							log.Fatalf("Cannot create file %s: %v", localPath, err)
-//						}
-//						defer localFile.Close()
-//						// sync write block to file
-//						var block Block
-//						err = surfClient.GetBlock(blockHash, blockStoreAddr, &block)
-//						if err != nil {
-//							log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-//						}
-//						_, err = localFile.Write(block.BlockData)
-//					}
-//					// update local index
-//					localFileInfoMap[remoteFilename] = remoteFileMetaData
-//				}
-//			}
-//			// update server
-//			err = surfClient.UpdateFile(localFileMetaData, &localFileMetaData.Version)
-//			if err != nil {
-//				log.Fatalf("Error while updating file %s to the server: %v", localFilename, err)
-//			}
-//		}
-//	}
-//}
-//

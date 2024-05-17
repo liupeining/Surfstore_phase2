@@ -2,6 +2,7 @@ package surfstore
 
 import (
 	context "context"
+	"fmt"
 	"sync"
 )
 
@@ -25,6 +26,9 @@ func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Bloc
 func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, error) {
 	// block -> hash, then add to the map
 	hash := GetBlockHashString(block.BlockData)
+	fmt.Println("hash: ", hash)
+	fmt.Println("block size: ", block.BlockSize)
+	fmt.Println("block content: ", block.BlockData)
 	bs.RWMutex.Lock()
 	defer bs.RWMutex.RUnlock()
 	bs.BlockMap[hash] = block
