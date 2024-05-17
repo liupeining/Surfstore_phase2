@@ -69,7 +69,7 @@ func WriteMetaFile(fileMetas map[string]*FileMetaData, baseDir string) error {
 	// The table has 4 columns which are fileName, version, hashIndex, hashValue.
 	// Their types are TEXT, INT, INT, and TEXT respectively
 	for fileName, filemeta := range fileMetas {
-		for hashIndex, hashValue := range filemeta.BlockHashList {
+		for hashIndex, hashValue := range filemeta.BlockHashList { // Index should start from 0
 			statement.Exec(fileName, filemeta.Version, hashIndex, hashValue)
 		}
 	}
@@ -103,7 +103,40 @@ func LoadMetaFromMetaFile(baseDir string) (fileMetaMap map[string]*FileMetaData,
 	if err != nil {
 		log.Fatal("Error When Opening Meta")
 	}
-	panic("todo")
+	//panic("todo")
+	rows, err := db.Query(getDistinctFileName) // get all distinct file names
+	if err != nil {
+		log.Fatal("Error while querying distinct file names", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fileName string
+		var version int32
+		if err := rows.Scan(&fileName, &version); err != nil {
+			log.Fatal("Error while scanning distinct file names", err)
+		}
+		hashValues := []string{}
+		hashRows, err := db.Query("SELECT hash FROM metadata WHERE filename = ? AND version = ?", fileName, version)
+		defer hashRows.Close()
+		if err != nil {
+			log.Fatal("Error while scanning distinct file names", err)
+		}
+		for hashRows.Next() {
+			var hash string
+			if err := hashRows.Scan(&hash); err != nil {
+				log.Fatal("Error while scanning distinct file names", err)
+			}
+			hashValues = append(hashValues, hash)
+		}
+
+		fileMetaMap[fileName] = &FileMetaData{
+			Filename:      fileName,
+			Version:       version,
+			BlockHashList: hashValues,
+		}
+	}
+	return fileMetaMap, nil
 }
 
 /*
