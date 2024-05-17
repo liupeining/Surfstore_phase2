@@ -52,21 +52,35 @@ func ClientSync(client RPCClient) {
 			if info.Size()%int64(client.BlockSize) != 0 {
 				blocknum++
 			}
+			// Todo: remember to handle blocknum = 0 (done)
 			fmt.Println(blocknum)
 
 			// block -> hash list (single file)
 			blockHashList := make([]string, blocknum)
-			err2, done := blockToHash(path, blocknum, client, file, blockHashList)
-			if done {
-				return err2
+			if blocknum > 0 {
+				err2, done := blockToHash(path, blocknum, client, file, blockHashList)
+				if done {
+					return err2
+				}
+			} else {
+				blockHashList = make([]string, 1)
+				blockHashList[0] = GetBlockHashString(nil)
 			}
+
+			// debug
+			fmt.Println("block num: ", blocknum)
+			fmt.Println("len block hash list: ", len(blockHashList))
+			fmt.Println("block hash list: ", blockHashList[0])
+			// debug finish
+
 			updateLocalIndexFile(localFileInfoMap, info, blockHashList, baseDir) // compare with local index file
 		}
 		return nil
 	})
+	checkLocalDelete(localFileInfoMap, baseDir) // mark deleted files
 
 	// debug
-
+	fmt.Println("start print local index")
 	for k, v := range localFileInfoMap {
 		fmt.Println(k, v.BlockHashList[0], v.Version)
 	}
@@ -223,8 +237,34 @@ func ClientSync(client RPCClient) {
 
 }
 
+func checkLocalDelete(localFileInfoMap map[string]*FileMetaData, baseDir string) {
+	for filename, localFileMetaData := range localFileInfoMap {
+		filePath := filepath.Join(baseDir, filename)
+		_, err := os.Stat(filePath)
+		fmt.Println("file path: ", filePath)
+		if err != nil {
+			fmt.Println("file not exist: ", filename)
+			if localFileMetaData.BlockHashList[0] != "0" {
+				// file not exist -> mark as deleted
+				localFileInfoMap[filename] = &FileMetaData{
+					Filename:      filename,
+					Version:       localFileMetaData.Version + 1,
+					BlockHashList: []string{"0"},
+				}
+				fmt.Println("File deleted: ", filename)
+			}
+		}
+	}
+}
+
 func updateLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.FileInfo, blockHashList []string, baseDir string) {
 	if localFileMetaData, ok := localFileInfoMap[info.Name()]; ok {
+
+		// debug
+		fmt.Println("local hash: ", localFileMetaData.BlockHashList[0])
+		fmt.Println("remote hash: ", blockHashList[0])
+		// debug finish
+
 		if !CompareBlockHashList(localFileMetaData.BlockHashList, blockHashList) {
 			// file has changed -> update local index file
 			localFileInfoMap[info.Name()] = &FileMetaData{
@@ -244,19 +284,6 @@ func updateLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.Fil
 		}
 		fmt.Println("New file: ", info.Name())
 		fmt.Println("Version: ", 0)
-	}
-
-	// mark deleted files
-	for filename := range localFileInfoMap {
-		filePath := filepath.Join(baseDir, filename)
-		_, err := os.Stat(filePath)
-		if err != nil {
-			// file not exist -> mark as deleted
-			localFileInfoMap[filename].Version++
-			localFileInfoMap[filename].BlockHashList = make([]string, 0)
-			localFileInfoMap[filename].BlockHashList = append(localFileInfoMap[filename].BlockHashList, "0")
-			fmt.Println("File deleted: ", filename)
-		}
 	}
 }
 
