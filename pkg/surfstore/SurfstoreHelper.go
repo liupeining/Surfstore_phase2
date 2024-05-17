@@ -40,7 +40,9 @@ const createTable string = `create table if not exists indexes (
 		hashValue TEXT
 	);`
 
-const insertTuple string = ``
+// insert into: put a new tuple into the table(indexes)
+// (?, ?, ?, ?) are placeholders for the values of the tuple
+const insertTuple string = `insert into indexes (fileName, version, hashIndex, hashValue) VALUES (?, ?, ?, ?);`
 
 // WriteMetaFile writes the file meta map back to local metadata file index.db
 func WriteMetaFile(fileMetas map[string]*FileMetaData, baseDir string) error {
@@ -81,9 +83,11 @@ func WriteMetaFile(fileMetas map[string]*FileMetaData, baseDir string) error {
 /*
 Reading Local Metadata File Related
 */
-const getDistinctFileName string = ``
+const getDistinctFileName string = `select distinct fileName, version from indexes;`
 
-const getTuplesByFileName string = ``
+// asc: ascending order
+const getTuplesByFileName string = `select fileName, version, hashIndex, hashValue from indexes where fileName=? AND version=? order by hashIndex ASC
+`
 
 // LoadMetaFromMetaFile loads the local metadata file into a file meta map.
 // The key is the file's name and the value is the file's metadata.
@@ -104,6 +108,17 @@ func LoadMetaFromMetaFile(baseDir string) (fileMetaMap map[string]*FileMetaData,
 		log.Fatal("Error When Opening Meta")
 	}
 	//panic("todo")
+
+	statement, err := db.Prepare(createTable)
+	if err != nil {
+		log.Fatalf("Error create Table: %v", err)
+	}
+
+	if _, err = statement.Exec(); err != nil {
+		log.Fatalf("Error create Table: %v", err)
+	}
+	statement.Close()
+
 	rows, err := db.Query(getDistinctFileName) // get all distinct file names
 	if err != nil {
 		log.Fatal("Error while querying distinct file names", err)
@@ -114,18 +129,18 @@ func LoadMetaFromMetaFile(baseDir string) (fileMetaMap map[string]*FileMetaData,
 		var fileName string
 		var version int32
 		if err := rows.Scan(&fileName, &version); err != nil {
-			log.Fatal("Error while scanning distinct file names", err)
+			log.Fatal("Error while scanning distinct file names1", err)
 		}
 		hashValues := []string{}
-		hashRows, err := db.Query("SELECT hash FROM metadata WHERE filename = ? AND version = ?", fileName, version)
+		hashRows, err := db.Query(getTuplesByFileName, fileName, version)
 		defer hashRows.Close()
 		if err != nil {
-			log.Fatal("Error while scanning distinct file names", err)
+			log.Fatal("Error while scanning distinct file names2", err)
 		}
 		for hashRows.Next() {
 			var hash string
 			if err := hashRows.Scan(&hash); err != nil {
-				log.Fatal("Error while scanning distinct file names", err)
+				log.Fatal("Error while scanning distinct file names3", err)
 			}
 			hashValues = append(hashValues, hash)
 		}

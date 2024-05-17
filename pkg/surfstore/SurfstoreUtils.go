@@ -68,15 +68,14 @@ func ClientSync(client RPCClient) {
 			updateLocalIndexFile(localFileInfoMap, info, blockHashList, baseDir) // compare with local index file
 			filenames2HashMap[info.Name()] = blockHashList
 		}
-
-		// debug
-		for k, v := range filenames2HashMap {
-			fmt.Println(k, v[0])
-		}
-		// debug finish
 		return nil
 	})
 
+	// debug
+	for k, v := range filenames2HashMap {
+		fmt.Println(k, v[0])
+	}
+	// debug finish
 	localIndex, err := LoadMetaFromMetaFile(client.BaseDir)
 	fmt.Println("local index: ", localIndex)
 }
