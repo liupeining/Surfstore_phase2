@@ -84,6 +84,18 @@ func ClientSync(client RPCClient) {
 		log.Fatalf("Error while walking through the baseDir: %v", err)
 	}
 
+	// mark deleted files
+	for filename := range localFileInfoMap {
+		filePath := filepath.Join(baseDir, filename)
+		_, err := os.Stat(filePath)
+		if err != nil {
+			// file not exist -> mark as deleted
+			localFileInfoMap[filename].Version++
+			localFileInfoMap[filename].BlockHashList = make([]string, 0)
+			localFileInfoMap[filename].BlockHashList = append(localFileInfoMap[filename].BlockHashList, "0")
+		}
+	}
+
 	//Next, the client should connect to the server and download an updated FileInfoMap. For the
 	//purposes of this discussion, let’s call this the “remote index.”
 
@@ -105,11 +117,26 @@ func ClientSync(client RPCClient) {
 	for remoteFilename, remoteFileMetaData := range remoteIndex {
 		localFileMetaData, ok := localFileInfoMap[remoteFilename]
 		_, err = os.Stat(filepath.Join(baseDir, remoteFilename))
+
 		// 1. local index no file
 		// 2. local index with file, but remote is newer
 		// 3. local index with file, but local no file
 		// -> download
 		if !ok || (ok && remoteFileMetaData.Version > localFileMetaData.Version) || err != nil {
+
+			// check if file is deleted
+			if ok && remoteFileMetaData.Version > localFileMetaData.Version {
+				if remoteFileMetaData.BlockHashList[0] == "0" {
+					err = os.Remove(filepath.Join(baseDir, remoteFilename))
+					if err != nil {
+						log.Fatalf("Error while deleting file %s: %v", remoteFilename, err)
+					}
+					// update local index
+					localFileInfoMap[remoteFilename] = remoteFileMetaData
+					continue
+				}
+			}
+
 			// download file
 			blockStoreAddr := ""
 			surfClient.GetBlockStoreAddr(&blockStoreAddr)
