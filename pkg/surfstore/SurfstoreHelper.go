@@ -138,11 +138,14 @@ func LoadMetaFromMetaFile(baseDir string) (fileMetaMap map[string]*FileMetaData,
 			log.Fatal("Error while scanning distinct file names2", err)
 		}
 		for hashRows.Next() {
-			var hash string
-			if err := hashRows.Scan(&hash); err != nil {
+			var fileName string
+			var version int
+			var hashIndex int
+			var hashValue string
+			if err := hashRows.Scan(&fileName, &version, &hashIndex, &hashValue); err != nil {
 				log.Fatal("Error while scanning distinct file names3", err)
 			}
-			hashValues = append(hashValues, hash)
+			hashValues = append(hashValues, hashValue)
 		}
 
 		fileMetaMap[fileName] = &FileMetaData{
