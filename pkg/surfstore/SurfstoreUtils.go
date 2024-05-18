@@ -25,15 +25,24 @@ func ClientSync(client RPCClient) {
 	baseDir, localFileInfoMap, err := getLocalInfo(client)
 	err = updateLocalIndexFile(client, err, baseDir, localFileInfoMap)
 	//err = debugUpdateLocalFile(localFileInfoMap, err, baseDir)
+	fmt.Println("finish update local index")
 
-	//remoteIndex, err := getRemoteIndexFile(client, err)
-	// debug
-	remoteIndex, err := LoadMetaFromMetaFile("testremote")
-	fmt.Println("start print remote index")
-	for k, v := range remoteIndex {
-		fmt.Println(k, v.BlockHashList[0], v.Version)
+	remoteIndex, err := getRemoteIndexFile(client, err)
+	if err != nil {
+		log.Fatalf("Error while getting remote index file: %v", err)
 	}
-	fmt.Println("finish print remote index")
+	if remoteIndex == nil {
+		remoteIndex = make(map[string]*FileMetaData)
+	}
+	fmt.Println("finish get remote index")
+	// debug
+	// remoteIndex, err := LoadMetaFromMetaFile("testremote")
+	// fmt.Println("start print remote index")
+	// for k, v := range remoteIndex {
+	//	 fmt.Println(k, v.BlockHashList[0], v.Version)
+	// }
+	// fmt.Println("finish print remote index")
+	// debug finish
 
 	// ************************************************************
 	// First, it is possible that the remote index refers to a file not present in the local index or in the
