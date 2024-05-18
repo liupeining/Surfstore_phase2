@@ -243,7 +243,8 @@ func ClientSync(client RPCClient) {
 								}
 								// get file to local base directory
 								localPath := filepath.Join(client.BaseDir, remoteFilename)
-								localFile, err := os.Create(localPath)
+								//localFile, err := os.Create(localPath)
+								localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 								if err != nil {
 									log.Fatalf("Cannot create file %s: %v", localPath, err)
 								}
@@ -285,7 +286,8 @@ func ClientSync(client RPCClient) {
 						}
 						// get file to local base directory
 						localPath := filepath.Join(client.BaseDir, remoteFilename)
-						localFile, err := os.Create(localPath)
+						//localFile, err := os.Create(localPath)
+						localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 						if err != nil {
 							log.Fatalf("Cannot create file %s: %v", localPath, err)
 						}
@@ -328,7 +330,8 @@ func ClientSync(client RPCClient) {
 							}
 							// get file to local base directory
 							localPath := filepath.Join(client.BaseDir, remoteFilename)
-							localFile, err := os.Create(localPath)
+							//localFile, err := os.Create(localPath)
+							localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 							if err != nil {
 								log.Fatalf("Cannot create file %s: %v", localPath, err)
 							}
@@ -453,7 +456,8 @@ func ClientSync(client RPCClient) {
 							}
 							// get file to local base directory
 							localPath := filepath.Join(client.BaseDir, remoteFilename)
-							localFile, err := os.Create(localPath)
+							//localFile, err := os.Create(localPath)
+							localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 							if err != nil {
 								log.Fatalf("Cannot create file %s: %v", localPath, err)
 							}
