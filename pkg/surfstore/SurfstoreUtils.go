@@ -101,35 +101,7 @@ func ClientSync(client RPCClient) {
 		fmt.Println("remote file name: ", remoteFilename)
 		if _, ok := localFileInfoMap[remoteFilename]; !ok {
 			if remoteFileMetaData.BlockHashList[0] != "0" { // remote file is not deleted, download file
-				fmt.Println("downloading file")
-				blockStoreAddr := ""
-				client.GetBlockStoreAddr(&blockStoreAddr)
-				// check block length
-				fmt.Println("block hash list length: ", len(remoteFileMetaData.BlockHashList))
-				for _, blockHash := range remoteFileMetaData.BlockHashList {
-					var block Block
-					err = client.GetBlock(blockHash, blockStoreAddr, &block)
-					if err != nil {
-						log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-					}
-					// get file to local base directory
-					localPath := filepath.Join(client.BaseDir, remoteFilename)
-					// _, err := os.Create(localPath) wrong, new block will overwrite the file
-					localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-					if err != nil {
-						log.Fatalf("Cannot create file %s: %v", localPath, err)
-					}
-					defer localFile.Close()
-					// sync write block to file
-					_, err = localFile.Write(block.BlockData)
-
-					if err != nil {
-						log.Fatalf("Error while writing block to file %s: %v", localPath, err)
-					}
-				}
-				// update local index
-				localFileInfoMap[remoteFilename] = remoteFileMetaData
-				fmt.Println("Download file: ", remoteFilename)
+				downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 			} else {
 				// remote file is deleted, update local index
 				localFileInfoMap[remoteFilename] = remoteFileMetaData
@@ -231,33 +203,7 @@ func ClientSync(client RPCClient) {
 							localFileInfoMap[remoteFilename] = remoteFileMetaData
 							fmt.Println("Delete local file: ", remoteFilename)
 						} else {
-							// download file
-							fmt.Println("downloading file")
-							blockStoreAddr := ""
-							client.GetBlockStoreAddr(&blockStoreAddr)
-							for _, blockHash := range remoteFileMetaData.BlockHashList {
-								var block Block
-								err = client.GetBlock(blockHash, blockStoreAddr, &block)
-								if err != nil {
-									log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-								}
-								// get file to local base directory
-								localPath := filepath.Join(client.BaseDir, remoteFilename)
-								//localFile, err := os.Create(localPath)
-								localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-								if err != nil {
-									log.Fatalf("Cannot create file %s: %v", localPath, err)
-								}
-								defer localFile.Close()
-								// sync write block to file
-								_, err = localFile.Write(block.BlockData)
-								if err != nil {
-									log.Fatalf("Error while writing block to file %s: %v", localPath, err)
-								}
-							}
-							// update local index
-							localFileInfoMap[remoteFilename] = remoteFileMetaData
-							fmt.Println("Download file: ", remoteFilename)
+							downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 						}
 					}
 				}
@@ -274,33 +220,7 @@ func ClientSync(client RPCClient) {
 					localFileInfoMap[remoteFilename] = remoteFileMetaData
 					fmt.Println("Delete local file: ", remoteFilename)
 				} else {
-					// download file
-					fmt.Println("downloading file")
-					blockStoreAddr := ""
-					client.GetBlockStoreAddr(&blockStoreAddr)
-					for _, blockHash := range remoteFileMetaData.BlockHashList {
-						var block Block
-						err = client.GetBlock(blockHash, blockStoreAddr, &block)
-						if err != nil {
-							log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-						}
-						// get file to local base directory
-						localPath := filepath.Join(client.BaseDir, remoteFilename)
-						//localFile, err := os.Create(localPath)
-						localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-						if err != nil {
-							log.Fatalf("Cannot create file %s: %v", localPath, err)
-						}
-						defer localFile.Close()
-						// sync write block to file
-						_, err = localFile.Write(block.BlockData)
-						if err != nil {
-							log.Fatalf("Error while writing block to file %s: %v", localPath, err)
-						}
-					}
-					// update local index
-					localFileInfoMap[remoteFilename] = remoteFileMetaData
-					fmt.Println("Download file: ", remoteFilename)
+					downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 				}
 			} else if localFileMetaData.Version == remoteFileMetaData.Version {
 				// - local hash list == remote hash list -> sync with remote, do nothing
@@ -318,33 +238,7 @@ func ClientSync(client RPCClient) {
 						localFileInfoMap[remoteFilename] = remoteFileMetaData
 						fmt.Println("Delete local file: ", remoteFilename)
 					} else {
-						// download file
-						fmt.Println("downloading file")
-						blockStoreAddr := ""
-						client.GetBlockStoreAddr(&blockStoreAddr)
-						for _, blockHash := range remoteFileMetaData.BlockHashList {
-							var block Block
-							err = client.GetBlock(blockHash, blockStoreAddr, &block)
-							if err != nil {
-								log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-							}
-							// get file to local base directory
-							localPath := filepath.Join(client.BaseDir, remoteFilename)
-							//localFile, err := os.Create(localPath)
-							localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-							if err != nil {
-								log.Fatalf("Cannot create file %s: %v", localPath, err)
-							}
-							defer localFile.Close()
-							// sync write block to file
-							_, err = localFile.Write(block.BlockData)
-							if err != nil {
-								log.Fatalf("Error while writing block to file %s: %v", localPath, err)
-							}
-						}
-						// update local index
-						localFileInfoMap[remoteFilename] = remoteFileMetaData
-						fmt.Println("Download file: ", remoteFilename)
+						downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 					}
 				} else {
 					// sync with remote, do nothing
@@ -444,33 +338,7 @@ func ClientSync(client RPCClient) {
 						localFileInfoMap[remoteFilename] = remoteFileMetaData
 						fmt.Println("Delete local file: ", remoteFilename)
 					} else {
-						// download file
-						fmt.Println("downloading file")
-						blockStoreAddr := ""
-						client.GetBlockStoreAddr(&blockStoreAddr)
-						for _, blockHash := range remoteFileMetaData.BlockHashList {
-							var block Block
-							err = client.GetBlock(blockHash, blockStoreAddr, &block)
-							if err != nil {
-								log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
-							}
-							// get file to local base directory
-							localPath := filepath.Join(client.BaseDir, remoteFilename)
-							//localFile, err := os.Create(localPath)
-							localFile, err := os.OpenFile(localPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-							if err != nil {
-								log.Fatalf("Cannot create file %s: %v", localPath, err)
-							}
-							defer localFile.Close()
-							// sync write block to file
-							_, err = localFile.Write(block.BlockData)
-							if err != nil {
-								log.Fatalf("Error while writing block to file %s: %v", localPath, err)
-							}
-						}
-						// update local index
-						localFileInfoMap[remoteFilename] = remoteFileMetaData
-						fmt.Println("Download file: ", remoteFilename)
+						downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 					}
 				}
 			}
@@ -492,6 +360,38 @@ func ClientSync(client RPCClient) {
 	//	fmt.Println(k, v.BlockHashList[0], v.Version)
 	//}
 	//fmt.Println("finish print local index")
+}
+
+func downloadFile(client RPCClient, remoteFileMetaData *FileMetaData, err error, remoteFilename string, localFileInfoMap map[string]*FileMetaData) {
+	// download file
+	fmt.Println("downloading file")
+	blockStoreAddr := ""
+	client.GetBlockStoreAddr(&blockStoreAddr)
+
+	localPath := ConcatPath(client.BaseDir, remoteFilename)
+	localFile, err := os.Create(localPath)
+	if err != nil {
+		log.Fatalf("Cannot create file %s: %v", localPath, err)
+	}
+	defer localFile.Close()
+
+	for _, blockHash := range remoteFileMetaData.BlockHashList {
+		var block Block
+		err = client.GetBlock(blockHash, blockStoreAddr, &block)
+		if err != nil {
+			log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
+		}
+
+		// sync write block to file
+		_, err = localFile.Write(block.BlockData)
+		if err != nil {
+			log.Fatalf("Error while writing block to file %s: %v", localPath, err)
+		}
+	}
+
+	// update local index
+	localFileInfoMap[remoteFilename] = remoteFileMetaData
+	fmt.Println("Download file: ", remoteFilename)
 }
 
 func getRemoteIndexFile(client RPCClient, err error) (map[string]*FileMetaData, error) {
