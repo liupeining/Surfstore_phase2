@@ -55,12 +55,12 @@ func (surfClient *RPCClient) PutBlock(block *Block, blockStoreAddr string, succ 
 	// perform the call
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = c.PutBlock(ctx, block)
+	success, err := c.PutBlock(ctx, block) // actually I don't know why we need this success
 	if err != nil {
 		conn.Close()
 		return err
 	}
-	*succ = true
+	*succ = success.Flag
 
 	// close the connection
 	return conn.Close()
@@ -163,7 +163,6 @@ var _ ClientInterface = new(RPCClient)
 
 // Create an Surfstore RPC client
 func NewSurfstoreRPCClient(hostPort, baseDir string, blockSize int) RPCClient {
-
 	return RPCClient{
 		MetaStoreAddr: hostPort,
 		BaseDir:       baseDir,

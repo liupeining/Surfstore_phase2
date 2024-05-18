@@ -152,14 +152,14 @@ func ClientSync(client RPCClient) {
 
 					// upload block to block store
 					if blocknum == 0 {
-						var block Block
-						block.BlockData = nil
-						block.BlockSize = 0
-						var success bool
-						err = client.PutBlock(&block, blockStoreAddr, &success)
-						if err != nil || !success {
-							log.Fatalf("Error while putting block %d to the server: %v", 0, err)
-						}
+						//var block Block
+						//block.BlockData = nil
+						//block.BlockSize = 0
+						//var success bool
+						//err = client.PutBlock(&block, blockStoreAddr, &success)
+						//if err != nil || !success {
+						//	log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+						//}
 					} else {
 						blockData := make([]byte, client.BlockSize)
 						for i := int64(0); i < blocknum; i++ {
@@ -299,14 +299,14 @@ func ClientSync(client RPCClient) {
 
 				// upload block to block store
 				if blocknum == 0 {
-					var block Block
-					block.BlockData = nil
-					block.BlockSize = 0
-					var success bool
-					err = client.PutBlock(&block, blockStoreAddr, &success)
-					if err != nil || !success {
-						log.Fatalf("Error while putting block %d to the server: %v", 0, err)
-					}
+					//var block Block
+					//block.BlockData = nil
+					//block.BlockSize = 0
+					//var success bool
+					//err = client.PutBlock(&block, blockStoreAddr, &success)
+					//if err != nil || !success {
+					//	log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+					//}
 				} else {
 					blockData := make([]byte, client.BlockSize)
 					for i := int64(0); i < blocknum; i++ {

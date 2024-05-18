@@ -18,8 +18,8 @@ func (m *MetaStore) GetFileInfoMap(ctx context.Context, _ *emptypb.Empty) (*File
 	// Retrieves the server's FileInfoMap
 	// map<string, FileMetaData> fileInfoMap
 	// string: used to get the member of FileInfoMap struct, I think.
-	m.RWMutex.RLock()
-	defer m.RWMutex.RUnlock()
+	//m.RWMutex.RLock()
+	//defer m.RWMutex.RUnlock()
 	//type FileInfoMap struct {
 	//	state         protoimpl.MessageState
 	//	sizeCache     protoimpl.SizeCache
@@ -30,15 +30,17 @@ func (m *MetaStore) GetFileInfoMap(ctx context.Context, _ *emptypb.Empty) (*File
 	fileInfoMap := &FileInfoMap{
 		FileInfoMap: make(map[string]*FileMetaData),
 	}
+	m.RWMutex.RLock()
 	for k, v := range m.FileMetaMap {
 		fileInfoMap.FileInfoMap[k] = v
 	}
+	m.RWMutex.RUnlock()
 	return fileInfoMap, nil
 }
 
 func (m *MetaStore) UpdateFile(ctx context.Context, fileMetaData *FileMetaData) (*Version, error) {
 	m.RWMutex.RLock()
-	defer m.RWMutex.RUnlock()
+	m.RWMutex.RUnlock()
 	//message FileMetaData {
 	//    string filename = 1;
 	//    int32 version = 2;
@@ -55,6 +57,7 @@ func (m *MetaStore) UpdateFile(ctx context.Context, fileMetaData *FileMetaData) 
 	} else {
 		m.FileMetaMap[fileMetaData.Filename] = fileMetaData
 	}
+	m.RWMutex.RUnlock()
 	return &Version{Version: fileMetaData.Version}, nil
 }
 
@@ -62,8 +65,8 @@ func (m *MetaStore) GetBlockStoreAddr(ctx context.Context, _ *emptypb.Empty) (*B
 	//message BlockStoreAddr {
 	//    string addr = 1;
 	//}
-	m.RWMutex.RLock()
-	defer m.RWMutex.RUnlock()
+	//m.RWMutex.RLock()
+	//defer m.RWMutex.RUnlock()
 	return &BlockStoreAddr{Addr: m.BlockStoreAddr}, nil
 }
 

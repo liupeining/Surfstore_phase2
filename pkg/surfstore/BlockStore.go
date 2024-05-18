@@ -1,9 +1,12 @@
 package surfstore
 
+import "sync"
+
+// don't know the reason but when use defer bs.RWMutex.RUnlock():
+// it will -> fatal error: sync: RUnlock of unlocked RWMutex
+
 import (
 	context "context"
-	"fmt"
-	"sync"
 )
 
 type BlockStore struct {
@@ -17,22 +20,22 @@ func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Bloc
 	// hash -> block
 	// RWMutex: when multiple clients try to get the block, map could be modified
 	bs.RWMutex.RLock()
-	defer bs.RWMutex.RUnlock()
+	//defer bs.RWMutex.RUnlock()
 	block := bs.BlockMap[blockHash.Hash]
-	//bs.RWMutex.RUnlock()
+	bs.RWMutex.RUnlock()
 	return block, nil
 }
 
 func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, error) {
 	// block -> hash, then add to the map
 	hash := GetBlockHashString(block.BlockData)
-	fmt.Println("hash: ", hash)
-	fmt.Println("block size: ", block.BlockSize)
-	fmt.Println("block content: ", block.BlockData)
+	//fmt.Println("hash: ", hash)
+	//fmt.Println("block size: ", block.BlockSize)
+	//fmt.Println("block content: ", block.BlockData)
 	bs.RWMutex.Lock()
-	defer bs.RWMutex.RUnlock()
+	//defer bs.RWMutex.RUnlock()
 	bs.BlockMap[hash] = block
-	//bs.RWMutex.Unlock()
+	bs.RWMutex.Unlock()
 	return &Success{Flag: true}, nil
 }
 
@@ -40,11 +43,12 @@ func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, err
 // hashes that are not stored in the key-value store
 func (bs *BlockStore) MissingBlocks(ctx context.Context, blockHashesIn *BlockHashes) (*BlockHashes, error) {
 	hashNoStore := make([]string, 0)
-	bs.RWMutex.RLock()
-	defer bs.RWMutex.RUnlock()
+	//bs.RWMutex.RLock()
+	//defer bs.RWMutex.RUnlock()
 	for _, blockHash := range blockHashesIn.Hashes {
+		bs.RWMutex.RLock()
 		_, exists := bs.BlockMap[blockHash]
-		//bs.RWMutex.RUnlock()
+		bs.RWMutex.RUnlock()
 		if !exists {
 			hashNoStore = append(hashNoStore, blockHash)
 		}
