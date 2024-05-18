@@ -558,7 +558,7 @@ func compareLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.Fi
 			BlockHashList: blockHashList,
 		}
 		fmt.Println("New file: ", info.Name())
-		fmt.Println("Version: ", 0)
+		fmt.Println("Version: ", 1)
 	}
 }
 
