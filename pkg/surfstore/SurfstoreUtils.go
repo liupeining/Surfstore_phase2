@@ -99,6 +99,7 @@ func ClientSync(client RPCClient) {
 	// local index no file -> download file
 	for remoteFilename, remoteFileMetaData := range remoteIndex {
 		fmt.Println("remote file name: ", remoteFilename)
+		fmt.Println("remote file version: ", remoteFileMetaData.Version)
 		if _, ok := localFileInfoMap[remoteFilename]; !ok {
 			if remoteFileMetaData.BlockHashList[0] != "0" { // remote file is not deleted, download file
 				downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
@@ -108,6 +109,7 @@ func ClientSync(client RPCClient) {
 				fmt.Println("delete local file: ", remoteFilename)
 			}
 		} else {
+			fmt.Println("local file version: ", localFileInfoMap[remoteFilename].Version)
 			// local index has file, remote index has file -> compare version
 			localFileMetaData := localFileInfoMap[remoteFilename]
 			if localFileMetaData.Version > remoteFileMetaData.Version {
@@ -115,10 +117,43 @@ func ClientSync(client RPCClient) {
 				// - local hash[0] != "0" -> upload file
 				if localFileMetaData.BlockHashList[0] == "0" {
 					// delete remote file
-					remoteFileMetaData.Version++
+					remoteFileMetaData.Version = localFileMetaData.Version
 					remoteFileMetaData.BlockHashList = []string{"0"}
 					remoteIndex[remoteFilename] = remoteFileMetaData
 					fmt.Println("Delete remote file: ", remoteFilename)
+					fmt.Println("version: ", remoteFileMetaData.Version)
+
+					var returnedVersion int32
+					err = client.UpdateFile(remoteFileMetaData, &returnedVersion)
+					if err != nil {
+						log.Fatalf("Error while updating file %s to the server: %v", remoteFilename, err)
+					}
+					if returnedVersion == -1 {
+						// conflict, failed to update
+						fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
+						// get new remote index
+						remoteIndex, err = getRemoteIndexFile(client, err)
+						if err != nil {
+							log.Fatalf("Error while getting remote index file: %v", err)
+						}
+						if remoteIndex == nil {
+							remoteIndex = make(map[string]*FileMetaData)
+						}
+						// download file/ delete local file
+						remoteFileMetaData = remoteIndex[remoteFilename]
+						if remoteFileMetaData.BlockHashList[0] == "0" {
+							// delete local file
+							err = os.Remove(filepath.Join(baseDir, remoteFilename))
+							if err != nil {
+								log.Fatalf("Error while deleting file %s: %v", remoteFilename, err)
+							}
+							// update local index
+							localFileInfoMap[remoteFilename] = remoteFileMetaData
+							fmt.Println("Delete local file: ", remoteFilename)
+						} else {
+							downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
+						}
+					}
 				} else {
 					// upload file
 					localPath := filepath.Join(client.BaseDir, remoteFilename)
@@ -208,6 +243,7 @@ func ClientSync(client RPCClient) {
 					}
 				}
 			} else if localFileMetaData.Version < remoteFileMetaData.Version {
+				fmt.Println("a local old file: ", remoteFilename)
 				// - remote hash[0] == "0" -> delete local file
 				// - remote hash[0] != "0" -> download file
 				if remoteFileMetaData.BlockHashList[0] == "0" {
@@ -345,11 +381,13 @@ func ClientSync(client RPCClient) {
 		}
 	}
 
-	// finish sync, save remote index to index.db, save local index to index.db
-	err = WriteMetaFile(remoteIndex, "test")
-	if err != nil {
-		log.Fatalf("Error while writing metadata to index.db: %v", err)
-	}
+	// finish sync, save remote index to index.db, save local index to index.
+	// debug
+	// fmt.Println(remoteIndex["file7.jpg"].Version)
+	// err = WriteMetaFile(remoteIndex, baseDir)
+	//if err != nil {
+	//	log.Fatalf("Error while writing metadata to index.db: %v", err)
+	//}
 	err = WriteMetaFile(localFileInfoMap, baseDir)
 
 	// upload remote index to server
