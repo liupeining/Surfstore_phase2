@@ -2,7 +2,10 @@ package surfstore
 
 import (
 	context "context"
+	"database/sql"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"log"
+	"os"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -163,6 +166,25 @@ var _ ClientInterface = new(RPCClient)
 
 // Create an Surfstore RPC client
 func NewSurfstoreRPCClient(hostPort, baseDir string, blockSize int) RPCClient {
+	path := ConcatPath(baseDir, DEFAULT_META_FILENAME)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		indexFile, err := os.Create(path)
+		if err != nil {
+			log.Fatal("Error During creating file: ", err)
+		}
+		indexFile.Close()
+		db, err := sql.Open("sqlite3", path)
+		defer db.Close()
+		if err != nil {
+			log.Fatal("Error during opening index.db file", err)
+		}
+		statement, err := db.Prepare(createTable)
+		if err != nil {
+			log.Fatal("cannot create table", err)
+		}
+		statement.Exec()
+		statement.Close()
+	}
 	return RPCClient{
 		MetaStoreAddr: hostPort,
 		BaseDir:       baseDir,
