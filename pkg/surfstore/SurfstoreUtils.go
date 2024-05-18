@@ -477,11 +477,12 @@ func ClientSync(client RPCClient) {
 		}
 	}
 
-	// finish sync, save remote index to index.db
+	// finish sync, save remote index to index.db, save local index to index.db
 	err = WriteMetaFile(remoteIndex, "test")
 	if err != nil {
 		log.Fatalf("Error while writing metadata to index.db: %v", err)
 	}
+	err = WriteMetaFile(localFileInfoMap, baseDir)
 
 	// upload remote index to server
 
