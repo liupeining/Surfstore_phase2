@@ -40,7 +40,6 @@ func (m *MetaStore) GetFileInfoMap(ctx context.Context, _ *emptypb.Empty) (*File
 
 func (m *MetaStore) UpdateFile(ctx context.Context, fileMetaData *FileMetaData) (*Version, error) {
 	m.RWMutex.RLock()
-	m.RWMutex.RUnlock()
 	//message FileMetaData {
 	//    string filename = 1;
 	//    int32 version = 2;
