@@ -113,9 +113,11 @@ func ClientSync(client RPCClient) {
 				}
 				// update local index
 				localFileInfoMap[remoteFilename] = remoteFileMetaData
+				fmt.Println("Download file: ", remoteFilename)
 			} else {
 				// remote file is deleted, update local index
 				localFileInfoMap[remoteFilename] = remoteFileMetaData
+				fmt.Println("delete local file: ", remoteFilename)
 			}
 		} else {
 			// local index has file, remote index has file -> compare version
@@ -152,14 +154,14 @@ func ClientSync(client RPCClient) {
 
 					// upload block to block store
 					if blocknum == 0 {
-						//var block Block
-						//block.BlockData = nil
-						//block.BlockSize = 0
-						//var success bool
-						//err = client.PutBlock(&block, blockStoreAddr, &success)
-						//if err != nil || !success {
-						//	log.Fatalf("Error while putting block %d to the server: %v", 0, err)
-						//}
+						var block Block
+						block.BlockData = nil
+						block.BlockSize = 0
+						var success bool
+						err = client.PutBlock(&block, blockStoreAddr, &success)
+						if err != nil || !success {
+							log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+						}
 					} else {
 						blockData := make([]byte, client.BlockSize)
 						for i := int64(0); i < blocknum; i++ {
@@ -222,6 +224,7 @@ func ClientSync(client RPCClient) {
 					}
 					// update local index
 					localFileInfoMap[remoteFilename] = remoteFileMetaData
+					fmt.Println("Download file: ", remoteFilename)
 				}
 			} else if localFileMetaData.Version == remoteFileMetaData.Version {
 				// - local hash list == remote hash list -> sync with remote, do nothing
@@ -264,6 +267,7 @@ func ClientSync(client RPCClient) {
 						}
 						// update local index
 						localFileInfoMap[remoteFilename] = remoteFileMetaData
+						fmt.Println("Download file: ", remoteFilename)
 					}
 				} else {
 					// sync with remote, do nothing
@@ -299,14 +303,14 @@ func ClientSync(client RPCClient) {
 
 				// upload block to block store
 				if blocknum == 0 {
-					//var block Block
-					//block.BlockData = nil
-					//block.BlockSize = 0
-					//var success bool
-					//err = client.PutBlock(&block, blockStoreAddr, &success)
-					//if err != nil || !success {
-					//	log.Fatalf("Error while putting block %d to the server: %v", 0, err)
-					//}
+					var block Block
+					block.BlockData = nil
+					block.BlockSize = 0
+					var success bool
+					err = client.PutBlock(&block, blockStoreAddr, &success)
+					if err != nil || !success {
+						log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+					}
 				} else {
 					blockData := make([]byte, client.BlockSize)
 					for i := int64(0); i < blocknum; i++ {
@@ -334,6 +338,19 @@ func ClientSync(client RPCClient) {
 			}
 		}
 	}
+
+	// finish sync, save remote index to index.db
+	err = WriteMetaFile(remoteIndex, "test")
+	if err != nil {
+		log.Fatalf("Error while writing metadata to index.db: %v", err)
+	}
+
+	// debug
+	//fmt.Println("start print local index")
+	//for k, v := range localFileInfoMap {
+	//	fmt.Println(k, v.BlockHashList[0], v.Version)
+	//}
+	//fmt.Println("finish print local index")
 }
 
 func getRemoteIndexFile(client RPCClient, err error) (map[string]*FileMetaData, error) {
