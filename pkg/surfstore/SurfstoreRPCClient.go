@@ -18,6 +18,12 @@ type RPCClient struct {
 	BlockSize     int
 }
 
+func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *[]string) error {
+	panic("todo")
+}
+
+
+
 func (surfClient *RPCClient) GetBlock(blockHash string, blockStoreAddr string, block *Block) error {
 	// connect to the server
 	// grpc.withTransportCredentials: use insecure credentials, meaning no encryption
@@ -140,25 +146,33 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 	return conn.Close()
 }
 
-func (surfClient *RPCClient) GetBlockStoreAddr(blockStoreAddr *string) error {
-	//panic("todo")
-	// connect to the server
-	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
-	}
-	// conn: to the meta store server
-	c := NewMetaStoreClient(conn)
-	// perform the call
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	m, err := c.GetBlockStoreAddr(ctx, &emptypb.Empty{})
-	*blockStoreAddr = m.Addr
-	if err != nil {
-		conn.Close()
-	}
-	// close the connection
-	return conn.Close()
+//func (surfClient *RPCClient) GetBlockStoreAddr(blockStoreAddr *string) error {
+//	//panic("todo")
+//	// connect to the server
+//	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+//	if err != nil {
+//		return err
+//	}
+//	// conn: to the meta store server
+//	c := NewMetaStoreClient(conn)
+//	// perform the call
+//	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+//	defer cancel()
+//	m, err := c.GetBlockStoreAddr(ctx, &emptypb.Empty{})
+//	*blockStoreAddr = m.Addr
+//	if err != nil {
+//		conn.Close()
+//	}
+//	// close the connection
+//	return conn.Close()
+//}
+
+func (surfClient *RPCClient) GetBlockStoreMap(blockHashesIn []string, blockStoreMap *map[string][]string) error {
+	panic("todo")
+}
+
+func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
+	panic("todo")
 }
 
 // This line guarantees all method for RPCClient are implemented

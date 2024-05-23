@@ -26,6 +26,11 @@ func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Bloc
 	return block, nil
 }
 
+// Return a list containing all blockHashes on this block server
+func (bs *BlockStore) GetBlockHashes(ctx context.Context, _ *emptypb.Empty) (*BlockHashes, error) {
+	panic("todo")
+}
+
 func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, error) {
 	// block -> hash, then add to the map
 	hash := GetBlockHashString(block.BlockData)

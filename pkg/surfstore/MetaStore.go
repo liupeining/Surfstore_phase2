@@ -9,8 +9,10 @@ import (
 
 type MetaStore struct {
 	FileMetaMap    map[string]*FileMetaData
-	BlockStoreAddr string
 	RWMutex        sync.RWMutex
+	//BlockStoreAddr string
+	BlockStoreAddrs    []string
+	ConsistentHashRing *ConsistentHashRing
 	UnimplementedMetaStoreServer
 }
 
@@ -59,22 +61,33 @@ func (m *MetaStore) UpdateFile(ctx context.Context, fileMetaData *FileMetaData) 
 	m.RWMutex.RUnlock()
 	return &Version{Version: fileMetaData.Version}, nil
 }
+//
+//func (m *MetaStore) GetBlockStoreAddr(ctx context.Context, _ *emptypb.Empty) (*BlockStoreAddr, error) {
+//	//message BlockStoreAddr {
+//	//    string addr = 1;
+//	//}
+//	//m.RWMutex.RLock()
+//	//defer m.RWMutex.RUnlock()
+//	return &BlockStoreAddr{Addr: m.BlockStoreAddr}, nil
+//}
 
-func (m *MetaStore) GetBlockStoreAddr(ctx context.Context, _ *emptypb.Empty) (*BlockStoreAddr, error) {
-	//message BlockStoreAddr {
-	//    string addr = 1;
-	//}
-	//m.RWMutex.RLock()
-	//defer m.RWMutex.RUnlock()
-	return &BlockStoreAddr{Addr: m.BlockStoreAddr}, nil
+func (m *MetaStore) GetBlockStoreMap(ctx context.Context, blockHashesIn *BlockHashes) (*BlockStoreMap, error) {
+	panic("todo")
+}
+
+func (m *MetaStore) GetBlockStoreAddrs(ctx context.Context, _ *emptypb.Empty) (*BlockStoreAddrs, error) {
+	panic("todo")
 }
 
 // This line guarantees all method for MetaStore are implemented
 var _ MetaStoreInterface = new(MetaStore)
 
-func NewMetaStore(blockStoreAddr string) *MetaStore {
+//func NewMetaStore(blockStoreAddr string) *MetaStore {
+func NewMetaStore(blockStoreAddrs []string) *MetaStore {
 	return &MetaStore{
 		FileMetaMap:    map[string]*FileMetaData{},
-		BlockStoreAddr: blockStoreAddr,
+		//BlockStoreAddr: blockStoreAddr,
+		BlockStoreAddrs:    blockStoreAddrs,
+		ConsistentHashRing: NewConsistentHashRing(blockStoreAddrs),
 	}
 }
