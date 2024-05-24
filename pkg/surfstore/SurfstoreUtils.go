@@ -98,18 +98,18 @@ func ClientSync(client RPCClient) {
 
 	// local index no file -> download file
 	for remoteFilename, remoteFileMetaData := range remoteIndex {
-		fmt.Println("remote file name: ", remoteFilename)
-		fmt.Println("remote file version: ", remoteFileMetaData.Version)
+		//fmt.Println("remote file name: ", remoteFilename)
+		//fmt.Println("remote file version: ", remoteFileMetaData.Version)
 		if _, ok := localFileInfoMap[remoteFilename]; !ok {
 			if remoteFileMetaData.BlockHashList[0] != "0" { // remote file is not deleted, download file
 				downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 			} else {
 				// remote file is deleted, update local index
 				localFileInfoMap[remoteFilename] = remoteFileMetaData
-				fmt.Println("delete local file: ", remoteFilename)
+				//fmt.Println("delete local file: ", remoteFilename)
 			}
 		} else {
-			fmt.Println("local file version: ", localFileInfoMap[remoteFilename].Version)
+			//fmt.Println("local file version: ", localFileInfoMap[remoteFilename].Version)
 			// local index has file, remote index has file -> compare version
 			localFileMetaData := localFileInfoMap[remoteFilename]
 			if localFileMetaData.Version > remoteFileMetaData.Version {
@@ -120,8 +120,8 @@ func ClientSync(client RPCClient) {
 					remoteFileMetaData.Version = localFileMetaData.Version
 					remoteFileMetaData.BlockHashList = []string{"0"}
 					remoteIndex[remoteFilename] = remoteFileMetaData
-					fmt.Println("Delete remote file: ", remoteFilename)
-					fmt.Println("version: ", remoteFileMetaData.Version)
+					//fmt.Println("Delete remote file: ", remoteFilename)
+					//fmt.Println("version: ", remoteFileMetaData.Version)
 
 					var returnedVersion int32
 					err = client.UpdateFile(remoteFileMetaData, &returnedVersion)
@@ -130,7 +130,7 @@ func ClientSync(client RPCClient) {
 					}
 					if returnedVersion == -1 {
 						// conflict, failed to update
-						fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
+						//fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
 						// get new remote index
 						remoteIndex, err = getRemoteIndexFile(client, err)
 						if err != nil {
@@ -149,7 +149,7 @@ func ClientSync(client RPCClient) {
 							}
 							// update local index
 							localFileInfoMap[remoteFilename] = remoteFileMetaData
-							fmt.Println("Delete local file: ", remoteFilename)
+							//fmt.Println("Delete local file: ", remoteFilename)
 						} else {
 							downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 						}
@@ -218,7 +218,7 @@ func ClientSync(client RPCClient) {
 					if filestats.Size()%int64(client.BlockSize) != 0 {
 						blocknum++
 					}
-					fmt.Println("upload block num: ", blocknum)
+					//fmt.Println("upload block num: ", blocknum)
 
 					// upload block to block store
 					if blocknum == 0 {
@@ -257,7 +257,7 @@ func ClientSync(client RPCClient) {
 					remoteFileMetaData.Version = localFileMetaData.Version
 					remoteFileMetaData.BlockHashList = localFileMetaData.BlockHashList
 					remoteIndex[remoteFilename] = remoteFileMetaData
-					fmt.Println("Upload file: ", remoteFilename)
+					//fmt.Println("Upload file: ", remoteFilename)
 
 					var returnedVersion int32
 					err = client.UpdateFile(remoteFileMetaData, &returnedVersion)
@@ -266,7 +266,7 @@ func ClientSync(client RPCClient) {
 					}
 					if returnedVersion == -1 {
 						// conflict, failed to update
-						fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
+						//fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
 						// get new remote index
 						remoteIndex, err = getRemoteIndexFile(client, err)
 						if err != nil {
@@ -285,14 +285,14 @@ func ClientSync(client RPCClient) {
 							}
 							// update local index
 							localFileInfoMap[remoteFilename] = remoteFileMetaData
-							fmt.Println("Delete local file: ", remoteFilename)
+							//fmt.Println("Delete local file: ", remoteFilename)
 						} else {
 							downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 						}
 					}
 				}
 			} else if localFileMetaData.Version < remoteFileMetaData.Version {
-				fmt.Println("a local old file: ", remoteFilename)
+				//fmt.Println("a local old file: ", remoteFilename)
 				// - remote hash[0] == "0" -> delete local file
 				// - remote hash[0] != "0" -> download file
 				if remoteFileMetaData.BlockHashList[0] == "0" {
@@ -303,7 +303,7 @@ func ClientSync(client RPCClient) {
 					}
 					// update local index
 					localFileInfoMap[remoteFilename] = remoteFileMetaData
-					fmt.Println("Delete local file: ", remoteFilename)
+					//fmt.Println("Delete local file: ", remoteFilename)
 				} else {
 					downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 				}
@@ -312,7 +312,7 @@ func ClientSync(client RPCClient) {
 				// - local hash list != remote hash list -> there is conflict, tell client, and download/delete local file
 				// - same as local version < remote version
 				if !CompareBlockHashList(localFileMetaData.BlockHashList, remoteFileMetaData.BlockHashList) {
-					fmt.Println("Conflict: %s, unsuccessful local change, sync with remote", remoteFilename)
+					//fmt.Println("Conflict: %s, unsuccessful local change, sync with remote", remoteFilename)
 					if remoteFileMetaData.BlockHashList[0] == "0" {
 						// delete local file
 						err = os.Remove(filepath.Join(baseDir, remoteFilename))
@@ -321,7 +321,7 @@ func ClientSync(client RPCClient) {
 						}
 						// update local index
 						localFileInfoMap[remoteFilename] = remoteFileMetaData
-						fmt.Println("Delete local file: ", remoteFilename)
+						//fmt.Println("Delete local file: ", remoteFilename)
 					} else {
 						downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 					}
@@ -409,7 +409,7 @@ func ClientSync(client RPCClient) {
 					BlockHashList: localFileMetaData.BlockHashList,
 				}
 				remoteIndex[localFilename] = remoteFileMetaData
-				fmt.Println("Upload file: ", localFilename)
+				//fmt.Println("Upload file: ", localFilename)
 				remoteFilename := localFilename
 
 				var returnedVersion int32
@@ -419,7 +419,7 @@ func ClientSync(client RPCClient) {
 				}
 				if returnedVersion == -1 {
 					// conflict, failed to update
-					fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
+					//fmt.Println("Conflict: %s, unsuccessful remote change, download/delete local file", remoteFilename)
 					// get new remote index
 					remoteIndex, err = getRemoteIndexFile(client, err)
 					if err != nil {
@@ -438,7 +438,7 @@ func ClientSync(client RPCClient) {
 						}
 						// update local index
 						localFileInfoMap[remoteFilename] = remoteFileMetaData
-						fmt.Println("Delete local file: ", remoteFilename)
+						//fmt.Println("Delete local file: ", remoteFilename)
 					} else {
 						downloadFile(client, remoteFileMetaData, err, remoteFilename, localFileInfoMap)
 					}
@@ -454,9 +454,9 @@ func ClientSync(client RPCClient) {
 	//if err != nil {
 	//	log.Fatalf("Error while writing metadata to index.db: %v", err)
 	//}
-	fmt.Println("write to index.db")
+	//fmt.Println("write to index.db")
 	err = WriteMetaFile(localFileInfoMap, baseDir)
-	fmt.Println("finish sync")
+	//fmt.Println("finish sync")
 
 	// upload remote index to server
 
@@ -470,7 +470,7 @@ func ClientSync(client RPCClient) {
 
 func downloadFile(client RPCClient, remoteFileMetaData *FileMetaData, err error, remoteFilename string, localFileInfoMap map[string]*FileMetaData) {
 	// download file
-	fmt.Println("downloading file")
+	//fmt.Println("downloading file")
 	//blockStoreAddr := ""
 	//client.GetBlockStoreAddr(&blockStoreAddr)
 
@@ -529,7 +529,7 @@ func downloadFile(client RPCClient, remoteFileMetaData *FileMetaData, err error,
 
 	// update local index
 	localFileInfoMap[remoteFilename] = remoteFileMetaData
-	fmt.Println("Download file: ", remoteFilename)
+	//fmt.Println("Download file: ", remoteFilename)
 }
 
 func getRemoteIndexFile(client RPCClient, err error) (map[string]*FileMetaData, error) {
@@ -561,8 +561,8 @@ func debugUpdateLocalFile(localFileInfoMap map[string]*FileMetaData, err error, 
 func updateLocalIndexFile(client RPCClient, err error, baseDir string, localFileInfoMap map[string]*FileMetaData) error {
 	err = filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && info.Name() != ".DS_Store" && info.Name() != "index.db" {
-			fmt.Println("file name: ", info.Name())
-			fmt.Println("convert to hash")
+			//fmt.Println("file name: ", info.Name())
+			//fmt.Println("convert to hash")
 			file, err := os.Open(path)
 			if err != nil {
 				log.Printf("Cannot open file %s: %v", path, err)
@@ -575,7 +575,7 @@ func updateLocalIndexFile(client RPCClient, err error, baseDir string, localFile
 				blocknum++
 			}
 			// Todo: remember to handle blocknum = 0 (done)
-			fmt.Println(blocknum)
+			//fmt.Println(blocknum)
 
 			// block -> hash list (single file)
 			blockHashList := make([]string, blocknum)
@@ -593,9 +593,9 @@ func updateLocalIndexFile(client RPCClient, err error, baseDir string, localFile
 			}
 
 			// debug
-			fmt.Println("block num: ", blocknum)
-			fmt.Println("len block hash list: ", len(blockHashList))
-			fmt.Println("block hash list: ", blockHashList[0])
+			//fmt.Println("block num: ", blocknum)
+			//fmt.Println("len block hash list: ", len(blockHashList))
+			//fmt.Println("block hash list: ", blockHashList[0])
 			// debug finish
 
 			compareLocalIndexFile(localFileInfoMap, info, blockHashList, baseDir) // compare with local index file
@@ -619,9 +619,9 @@ func checkLocalDelete(localFileInfoMap map[string]*FileMetaData, baseDir string)
 	for filename, localFileMetaData := range localFileInfoMap {
 		filePath := filepath.Join(baseDir, filename)
 		_, err := os.Stat(filePath)
-		fmt.Println("file path: ", filePath)
+		//fmt.Println("file path: ", filePath)
 		if err != nil {
-			fmt.Println("file not exist: ", filename)
+			//fmt.Println("file not exist: ", filename)
 			if localFileMetaData.BlockHashList[0] != "0" {
 				// file not exist -> mark as deleted
 				localFileInfoMap[filename] = &FileMetaData{
@@ -629,7 +629,7 @@ func checkLocalDelete(localFileInfoMap map[string]*FileMetaData, baseDir string)
 					Version:       localFileMetaData.Version + 1,
 					BlockHashList: []string{"0"},
 				}
-				fmt.Println("File deleted: ", filename)
+				//fmt.Println("File deleted: ", filename)
 			}
 		}
 	}
@@ -639,8 +639,8 @@ func compareLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.Fi
 	if localFileMetaData, ok := localFileInfoMap[info.Name()]; ok {
 
 		// debug
-		fmt.Println("local hash: ", localFileMetaData.BlockHashList[0])
-		fmt.Println("remote hash: ", blockHashList[0])
+		//fmt.Println("local hash: ", localFileMetaData.BlockHashList[0])
+		//fmt.Println("remote hash: ", blockHashList[0])
 		// debug finish
 
 		if !CompareBlockHashList(localFileMetaData.BlockHashList, blockHashList) {
@@ -650,8 +650,8 @@ func compareLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.Fi
 				Version:       localFileMetaData.Version + 1,
 				BlockHashList: blockHashList,
 			}
-			fmt.Println("File has changed: ", info.Name())
-			fmt.Println("Version: ", localFileMetaData.Version+1)
+			//fmt.Println("File has changed: ", info.Name())
+			//fmt.Println("Version: ", localFileMetaData.Version+1)
 		}
 	} else {
 		// new file -> update local index file
@@ -660,8 +660,8 @@ func compareLocalIndexFile(localFileInfoMap map[string]*FileMetaData, info os.Fi
 			Version:       1, //try version 1...
 			BlockHashList: blockHashList,
 		}
-		fmt.Println("New file: ", info.Name())
-		fmt.Println("Version: ", 1)
+		//fmt.Println("New file: ", info.Name())
+		//fmt.Println("Version: ", 1)
 	}
 }
 
@@ -674,9 +674,12 @@ func blockToHash(path string, blocknum int64, client RPCClient, file *os.File, b
 			return nil, true
 		}
 		blockHashList[i] = GetBlockHashString(block[:n])
-		if i == 0 {
-			fmt.Println("block hash: ", blockHashList[i])
-		}
+
+		// debug
+		//if i == 0 {
+		//	fmt.Println("block hash: ", blockHashList[i])
+		//}
+		// debug finish
 	}
 	return nil, false
 }
