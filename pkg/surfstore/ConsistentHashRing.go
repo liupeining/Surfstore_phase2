@@ -48,8 +48,8 @@ func NewConsistentHashRing(serverAddrs []string) *ConsistentHashRing {
 	consistentHashRing.ServerMap = make(map[string]string)
 	for _, serverAddr := range serverAddrs {
 		// fix: shoud hash blockstorelocalhost:8082 instead of localhost:8082 oh...no
-		serverAddr = "blockstore" + serverAddr
-		consistentHashRing.ServerMap[consistentHashRing.Hash(serverAddr)] = serverAddr
+		// serverAddr = "blockstore" + serverAddr wrong, this will change the serverAddr
+		consistentHashRing.ServerMap[consistentHashRing.Hash("blockstore"+serverAddr)] = serverAddr
 	}
 	return &consistentHashRing
 }
