@@ -114,6 +114,8 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 	defer cancel()
 
 	m, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
+	// fmt.Println("m: ", m)
+	// I don't know why in project4, multiple blockserver, m can be nil
 	if err != nil {
 		conn.Close()
 	}

@@ -7,6 +7,8 @@ import (
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
+// address of meta store and block store
+
 type MetaStore struct {
 	FileMetaMap map[string]*FileMetaData
 	RWMutex     sync.RWMutex
@@ -29,15 +31,15 @@ func (m *MetaStore) GetFileInfoMap(ctx context.Context, _ *emptypb.Empty) (*File
 	//
 	//	FileInfoMap map[string]*FileMetaData `protobuf:"bytes,1,rep,name=fileInfoMap,proto3" json:"fileInfoMap,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	//}
-	fileInfoMap := &FileInfoMap{
-		FileInfoMap: make(map[string]*FileMetaData),
-	}
-	m.RWMutex.RLock()
-	for k, v := range m.FileMetaMap {
-		fileInfoMap.FileInfoMap[k] = v
-	}
-	m.RWMutex.RUnlock()
-	return fileInfoMap, nil
+	//fileInfoMap := &FileInfoMap{
+	//	FileInfoMap: make(map[string]*FileMetaData),
+	//}
+	//m.RWMutex.RLock()
+	//for k, v := range m.FileMetaMap {
+	//	fileInfoMap.FileInfoMap[k] = v
+	//}
+	//m.RWMutex.RUnlock()
+	return &FileInfoMap{FileInfoMap: m.FileMetaMap}, nil
 }
 
 func (m *MetaStore) UpdateFile(ctx context.Context, fileMetaData *FileMetaData) (*Version, error) {
