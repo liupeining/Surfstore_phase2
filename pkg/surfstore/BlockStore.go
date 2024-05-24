@@ -1,6 +1,9 @@
 package surfstore
 
-import "sync"
+import (
+	"google.golang.org/protobuf/types/known/emptypb"
+	"sync"
+)
 
 // don't know the reason but when use defer bs.RWMutex.RUnlock():
 // it will -> fatal error: sync: RUnlock of unlocked RWMutex
@@ -28,7 +31,14 @@ func (bs *BlockStore) GetBlock(ctx context.Context, blockHash *BlockHash) (*Bloc
 
 // Return a list containing all blockHashes on this block server
 func (bs *BlockStore) GetBlockHashes(ctx context.Context, _ *emptypb.Empty) (*BlockHashes, error) {
-	panic("todo")
+	//panic("todo")
+	hashes := make([]string, 0)
+	bs.RWMutex.RLock()
+	for hash := range bs.BlockMap { // hash: key(block hash)
+		hashes = append(hashes, hash)
+	}
+	bs.RWMutex.RUnlock()
+	return &BlockHashes{Hashes: hashes}, nil
 }
 
 func (bs *BlockStore) PutBlock(ctx context.Context, block *Block) (*Success, error) {
