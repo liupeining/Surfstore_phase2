@@ -19,7 +19,21 @@ type RPCClient struct {
 }
 
 func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string, blockHashes *[]string) error {
-	panic("todo")
+	//panic("todo")
+	conn, err := grpc.Dial(blockStoreAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	c := NewBlockStoreClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	b, err := c.GetBlockHashes(ctx, &emptypb.Empty{})
+	if err != nil {
+		conn.Close()
+		return err
+	}
+	*blockHashes = b.Hashes
+	return conn.Close()
 }
 
 func (surfClient *RPCClient) GetBlock(blockHash string, blockStoreAddr string, block *Block) error {
