@@ -44,12 +44,15 @@ func (c ConsistentHashRing) Hash(addr string) string {
 
 func NewConsistentHashRing(serverAddrs []string) *ConsistentHashRing {
 	//panic("todo")
-	consistentHashRing := ConsistentHashRing{}
-	consistentHashRing.ServerMap = make(map[string]string)
+	consistentHashRing := &ConsistentHashRing{
+		ServerMap: make(map[string]string),
+	}
 	for _, serverAddr := range serverAddrs {
 		// fix: shoud hash blockstorelocalhost:8082 instead of localhost:8082 oh...no
 		// serverAddr = "blockstore" + serverAddr wrong, this will change the serverAddr
-		consistentHashRing.ServerMap[consistentHashRing.Hash("blockstore"+serverAddr)] = serverAddr
+		// consistentHashRing.ServerMap[consistentHashRing.Hash("blockstore"+serverAddr)] = serverAddr
+		hashKey := "blockstore" + serverAddr
+		consistentHashRing.ServerMap[consistentHashRing.Hash(hashKey)] = serverAddr
 	}
-	return &consistentHashRing
+	return consistentHashRing
 }
