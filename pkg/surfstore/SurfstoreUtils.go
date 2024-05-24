@@ -156,14 +156,58 @@ func ClientSync(client RPCClient) {
 					}
 				} else {
 					// upload file
+					//Each time when you update a file, your program will break the file
+					//into blocks and compute hash values for each block (you’ve already
+					//implemented this in P3). Then instead of calling GetBlockStoreAddr,
+					//this time we will call GetBlockStoreMap which returns a map indicating
+					//which servers the blocks belong to based on the consistent hashing
+					//algorithm covered in the lecture. Based on this map, you can upload
+					//your blocks to corresponding block servers.
+
+					// ToDo: (method 1) -> not good...
+					// a file -> we have a list of block hashes in localFileMetaData.BlockHashList
+					// GetBlockStoreMap -> blockStoreMap: server address -> block hashes
+					// for each server address in blockStoreMap:
+					//     upload block to server address
+					// update remote index...
+
+					// hard to find block related to block hash
+
+					// ToDo: (method 2) -> better
+					// a file -> we have a list of block hashes in localFileMetaData.BlockHashList
+					// GetBlockStoreMap -> blockStoreMap: server address -> block hashes
+					// for each block hash in localFileMetaData.BlockHashList:
+					//     find the server address in blockStoreMap
+					//     upload block to server address
+
+					// ToDo: (method 3) -> use this
+					// a file -> we have a list of block hashes in localFileMetaData.BlockHashList
+					// GetBlockStoreMap -> blockStoreMap: server address -> block hashes
+					// change map to block hash -> server address
+					// for each block hash in localFileMetaData.BlockHashList:
+					//     find the server address in blockStoreMap
+					//     upload block to server address
+
+					// localFileMetaData.BlockHashList -> blockstoremap
+					blockStoreMap := map[string][]string{}
+					err = client.GetBlockStoreMap(localFileMetaData.BlockHashList, &blockStoreMap)
+					if err != nil {
+						log.Fatalf("Error while getting block store map from the server: %v", err)
+					}
+					// change map to block hash -> server address
+					hashToServer := map[string]string{}
+					for serverAddr, blockHashes := range blockStoreMap {
+						for _, blockHash := range blockHashes {
+							hashToServer[blockHash] = serverAddr
+						}
+					}
+
 					localPath := filepath.Join(client.BaseDir, remoteFilename)
 					file, err := os.Open(localPath)
 					if err != nil {
 						log.Fatalf("Cannot open file %s: %v", localPath, err)
 					}
 					defer file.Close()
-					blockStoreAddr := ""
-					client.GetBlockStoreAddr(&blockStoreAddr)
 
 					// get block num for the file
 					filestats, err := file.Stat()
@@ -178,14 +222,16 @@ func ClientSync(client RPCClient) {
 
 					// upload block to block store
 					if blocknum == 0 {
-						var block Block
-						block.BlockData = nil
-						block.BlockSize = 0
-						var success bool
-						err = client.PutBlock(&block, blockStoreAddr, &success)
-						if err != nil || !success {
-							log.Fatalf("Error while putting block %d to the server: %v", 0, err)
-						}
+						// TODO: no need to upload block if blocknum == 0, need change logic
+						//var block Block
+						//block.BlockData = nil
+						//block.BlockSize = 0
+						//var success bool
+						////err = client.PutBlock(&block, blockStoreAddr, &success)
+						//if err != nil || !success {
+						//	log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+						//}
+						// no need to upload block
 					} else {
 						blockData := make([]byte, client.BlockSize)
 						for i := int64(0); i < blocknum; i++ {
@@ -196,6 +242,9 @@ func ClientSync(client RPCClient) {
 							var block Block
 							block.BlockData = blockData[:n]
 							block.BlockSize = int32(n)
+
+							// get block store address
+							blockStoreAddr := hashToServer[GetBlockHashString(block.BlockData)]
 							var success bool
 							err = client.PutBlock(&block, blockStoreAddr, &success)
 							if err != nil || !success {
@@ -289,14 +338,29 @@ func ClientSync(client RPCClient) {
 		if _, ok := remoteIndex[localFilename]; !ok {
 			if localFileMetaData.BlockHashList[0] != "0" {
 				// upload file
+				// localFileMetaData.BlockHashList -> blockstoremap
+				blockStoreMap := map[string][]string{}
+				err = client.GetBlockStoreMap(localFileMetaData.BlockHashList, &blockStoreMap)
+				if err != nil {
+					log.Fatalf("Error while getting block store map from the server: %v", err)
+				}
+				// change map to block hash -> server address
+				hashToServer := map[string]string{}
+				for serverAddr, blockHashes := range blockStoreMap {
+					for _, blockHash := range blockHashes {
+						hashToServer[blockHash] = serverAddr
+					}
+				}
+
 				localPath := filepath.Join(client.BaseDir, localFilename)
 				file, err := os.Open(localPath)
 				if err != nil {
 					log.Fatalf("Cannot open file %s: %v", localPath, err)
 				}
 				defer file.Close()
-				blockStoreAddr := ""
-				client.GetBlockStoreAddr(&blockStoreAddr)
+
+				//blockStoreAddr := ""
+				//client.GetBlockStoreAddr(&blockStoreAddr)
 
 				// get block num for the file
 				filestats, err := file.Stat()
@@ -310,14 +374,15 @@ func ClientSync(client RPCClient) {
 
 				// upload block to block store
 				if blocknum == 0 {
-					var block Block
-					block.BlockData = nil
-					block.BlockSize = 0
-					var success bool
-					err = client.PutBlock(&block, blockStoreAddr, &success)
-					if err != nil || !success {
-						log.Fatalf("Error while putting block %d to the server: %v", 0, err)
-					}
+					//var block Block
+					//block.BlockData = nil
+					//block.BlockSize = 0
+					//var success bool
+					//
+					////err = client.PutBlock(&block, blockStoreAddr, &success)
+					//if err != nil || !success {
+					//	log.Fatalf("Error while putting block %d to the server: %v", 0, err)
+					//}
 				} else {
 					blockData := make([]byte, client.BlockSize)
 					for i := int64(0); i < blocknum; i++ {
@@ -329,6 +394,7 @@ func ClientSync(client RPCClient) {
 						block.BlockData = blockData[:n]
 						block.BlockSize = int32(n)
 						var success bool
+						blockStoreAddr := hashToServer[GetBlockHashString(block.BlockData)]
 						err = client.PutBlock(&block, blockStoreAddr, &success)
 						if err != nil || !success {
 							log.Fatalf("Error while putting block %d to the server: %v", i, err)
@@ -403,8 +469,38 @@ func ClientSync(client RPCClient) {
 func downloadFile(client RPCClient, remoteFileMetaData *FileMetaData, err error, remoteFilename string, localFileInfoMap map[string]*FileMetaData) {
 	// download file
 	fmt.Println("downloading file")
-	blockStoreAddr := ""
-	client.GetBlockStoreAddr(&blockStoreAddr)
+	//blockStoreAddr := ""
+	//client.GetBlockStoreAddr(&blockStoreAddr)
+
+	//blockStoreAddrs := []string{}
+	//err = client.GetBlockStoreAddrs(&blockStoreAddrs)
+	//if err != nil {
+	//	log.Fatalf("Error while getting block store address from the server: %v", err)
+	//}
+	// check remoteFileMetaData, if len = 1 and hash = -1, empty file, no need to download
+	// only open local path and exit
+	if len(remoteFileMetaData.BlockHashList) == 1 && remoteFileMetaData.BlockHashList[0] == "-1" {
+		localPath := ConcatPath(client.BaseDir, remoteFilename)
+		localFile, err := os.Create(localPath)
+		if err != nil {
+			log.Fatalf("Cannot create file %s: %v", localPath, err)
+		}
+		defer localFile.Close()
+		return
+	}
+
+	blockStoreMap := map[string][]string{}
+	err = client.GetBlockStoreMap(remoteFileMetaData.BlockHashList, &blockStoreMap)
+	if err != nil {
+		log.Fatalf("Error while getting block store map from the server: %v", err)
+	}
+	// change map to block hash -> server address
+	hashToServer := map[string]string{}
+	for serverAddr, blockHashes := range blockStoreMap {
+		for _, blockHash := range blockHashes {
+			hashToServer[blockHash] = serverAddr
+		}
+	}
 
 	localPath := ConcatPath(client.BaseDir, remoteFilename)
 	localFile, err := os.Create(localPath)
@@ -415,6 +511,8 @@ func downloadFile(client RPCClient, remoteFileMetaData *FileMetaData, err error,
 
 	for _, blockHash := range remoteFileMetaData.BlockHashList {
 		var block Block
+		// get block store address
+		blockStoreAddr := hashToServer[blockHash]
 		err = client.GetBlock(blockHash, blockStoreAddr, &block)
 		if err != nil {
 			log.Fatalf("Error while getting block %s from the server: %v", blockHash, err)
@@ -485,8 +583,11 @@ func updateLocalIndexFile(client RPCClient, err error, baseDir string, localFile
 					return err2
 				}
 			} else {
+				//In index.db, an empty file has a row that a single hash value of “-1”
+				//(a string with two characters). It’s like the following in the table.
 				blockHashList = make([]string, 1)
-				blockHashList[0] = GetBlockHashString(nil)
+				//blockHashList[0] = GetBlockHashString(nil)
+				blockHashList[0] = "-1"
 			}
 
 			// debug
