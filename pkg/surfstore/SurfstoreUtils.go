@@ -488,6 +488,7 @@ func downloadFile(client RPCClient, remoteFileMetaData *FileMetaData, err error,
 			log.Fatalf("Cannot create file %s: %v", localPath, err)
 		}
 		defer localFile.Close()
+		localFileInfoMap[remoteFilename] = remoteFileMetaData
 		return
 	}
 
